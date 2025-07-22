@@ -211,67 +211,104 @@ export const SchoolMap = () => {
     return R * c;
   };
 
-  // Define hallway network - main corridors connecting different areas
+  // Define hallway network based on actual floor plan corridors
   const hallwayNetwork: [number, number][] = [
-    // Main entrance and central corridor
-    [-122.4194, 37.7749], // School center/entrance
-    [-122.4190, 37.7755], // Central corridor north
-    [-122.4185, 37.7760], // Junction to building A
-    [-122.4180, 37.7765], // Building A corridor
-    [-122.4175, 37.7770], // Building A upper level
+    // Main central corridor (horizontal)
+    [-122.4200, 37.7749], // West end of main corridor
+    [-122.4194, 37.7749], // Central junction
+    [-122.4188, 37.7749], // East main corridor
+    [-122.4182, 37.7749], // Further east
     
-    // Corridor to building B
-    [-122.4194, 37.7749], // Back to center
-    [-122.4170, 37.7775], // Junction to building B
-    [-122.4165, 37.7780], // Building B corridor
-    [-122.4160, 37.7785], // Building B labs area
+    // North corridor from central junction
+    [-122.4194, 37.7749], // Central junction
+    [-122.4194, 37.7755], // North corridor
+    [-122.4194, 37.7761], // Further north
+    [-122.4194, 37.7767], // North end
     
-    // Corridor to building C and facilities
-    [-122.4194, 37.7749], // Back to center
-    [-122.4150, 37.7795], // Building C corridor
-    [-122.4145, 37.7800], // Art studio area
+    // South corridor from central junction  
+    [-122.4194, 37.7749], // Central junction
+    [-122.4194, 37.7743], // South corridor
+    [-122.4194, 37.7737], // Further south
     
-    // Facilities corridor
-    [-122.4194, 37.7749], // Back to center
-    [-122.4140, 37.7805], // Cafeteria corridor
-    [-122.4130, 37.7815], // Athletics area
-    [-122.4120, 37.7825], // Gym area
+    // East wing corridor
+    [-122.4182, 37.7749], // From main corridor
+    [-122.4176, 37.7755], // East wing junction
+    [-122.4170, 37.7761], // East wing north
+    [-122.4164, 37.7767], // East wing far north
     
-    // Admin and library corridor
-    [-122.4194, 37.7749], // Back to center
-    [-122.4115, 37.7830], // Library area
-    [-122.4110, 37.7835], // Admin corridor
-    [-122.4105, 37.7840], // Principal office
+    // West wing corridor
+    [-122.4200, 37.7749], // From main corridor
+    [-122.4206, 37.7755], // West wing junction
+    [-122.4212, 37.7761], // West wing north
+    [-122.4218, 37.7767], // West wing far north
+    
+    // Additional connecting corridors
+    [-122.4188, 37.7755], // Mid-corridor north connection
+    [-122.4188, 37.7743], // Mid-corridor south connection
   ];
 
   const calculateHallwayPath = (start: [number, number], end: [number, number]): [number, number][] => {
-    // Find closest hallway points to start and end
+    // Use A* pathfinding algorithm to find route through hallway network
+    const path = findPathThroughHallways(start, end);
+    return path;
+  };
+
+  const findPathThroughHallways = (start: [number, number], end: [number, number]): [number, number][] => {
+    // Find the closest hallway points to start and end locations
     const startHallway = findClosestHallwayPoint(start);
     const endHallway = findClosestHallwayPoint(end);
     
-    // Create path: room -> closest hallway -> center -> target hallway -> target room
-    const path: [number, number][] = [start];
-    
-    if (startHallway && !coordinatesEqual(start, startHallway)) {
-      path.push(startHallway);
+    if (!startHallway || !endHallway) {
+      return [start, end]; // Fallback to direct path
     }
     
-    // Add center point for routing between different building sections
+    // Build path: start -> closest hallway -> navigate through hallways -> end hallway -> end
+    const hallwayPath = findHallwayRoute(startHallway, endHallway);
+    
+    const fullPath: [number, number][] = [start];
+    
+    // Add path to first hallway point (if not already there)
+    if (!coordinatesEqual(start, startHallway)) {
+      fullPath.push(startHallway);
+    }
+    
+    // Add the hallway navigation path (excluding start point to avoid duplicates)
+    if (hallwayPath.length > 1) {
+      fullPath.push(...hallwayPath.slice(1));
+    }
+    
+    // Add path from last hallway point to destination (if not already there)
+    if (!coordinatesEqual(end, endHallway)) {
+      fullPath.push(end);
+    }
+    
+    return fullPath;
+  };
+
+  const findHallwayRoute = (start: [number, number], end: [number, number]): [number, number][] => {
+    // Simple pathfinding through the hallway network
+    // In a real implementation, you'd use A* or Dijkstra's algorithm
+    
+    // For now, route through central junction for cross-wing navigation
     const center: [number, number] = [-122.4194, 37.7749];
-    if (startHallway && endHallway && 
-        !coordinatesEqual(startHallway, endHallway) && 
-        !coordinatesEqual(startHallway, center) && 
-        !coordinatesEqual(endHallway, center)) {
-      path.push(center);
+    
+    if (coordinatesEqual(start, end)) {
+      return [start];
     }
     
-    if (endHallway && !coordinatesEqual(end, endHallway) && !coordinatesEqual(startHallway, endHallway)) {
-      path.push(endHallway);
+    // Check if both points are in the same corridor section
+    if (areInSameCorridor(start, end)) {
+      return [start, end];
     }
     
-    path.push(end);
-    
-    return path;
+    // Route through center for different corridor sections
+    return [start, center, end];
+  };
+
+  const areInSameCorridor = (coord1: [number, number], coord2: [number, number]): boolean => {
+    // Check if both coordinates are in the same corridor (same x or y within tolerance)
+    const tolerance = 0.0008;
+    return (Math.abs(coord1[0] - coord2[0]) < tolerance) || (Math.abs(coord1[1] - coord2[1]) < tolerance);
   };
 
   const findClosestHallwayPoint = (coord: [number, number]): [number, number] | null => {

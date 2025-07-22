@@ -40,8 +40,17 @@ export const ImageMap = () => {
     if (!imageRef.current) return;
     
     const rect = imageRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / zoom;
-    const y = (e.clientY - rect.top) / zoom;
+    const imageNaturalWidth = imageRef.current.naturalWidth;
+    const imageNaturalHeight = imageRef.current.naturalHeight;
+    const imageDisplayWidth = rect.width / zoom;
+    const imageDisplayHeight = rect.height / zoom;
+    
+    // Calculate the offset due to centering
+    const offsetX = (rect.width - imageDisplayWidth * zoom) / 2;
+    const offsetY = (rect.height - imageDisplayHeight * zoom) / 2;
+    
+    const x = (e.clientX - rect.left - offsetX) / zoom;
+    const y = (e.clientY - rect.top - offsetY) / zoom;
 
     if (isWaypointMode && newPointName.trim()) {
       const waypoint: Waypoint = {

@@ -1,7 +1,8 @@
-import { SchoolMap } from "@/components/SchoolMap";
+
+import { ImageMap } from "@/components/ImageMap";
 
 const Index = () => {
-  return <SchoolMap />;
+  return <ImageMap />;
 };
 
 export default Index;

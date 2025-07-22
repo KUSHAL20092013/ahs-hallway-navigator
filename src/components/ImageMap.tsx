@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Navigation, Trash2 } from 'lucide-react';
+import { MapPin, Plus, Navigation, Trash2, Sparkles, RotateCcw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface Waypoint {
@@ -118,6 +118,146 @@ export const ImageMap = () => {
     toast({ title: "Route cleared" });
   };
 
+  const autoGenerateWaypoints = () => {
+    if (waypoints.length < 3) {
+      toast({ title: "Place at least 3 waypoints first to establish patterns", variant: "destructive" });
+      return;
+    }
+
+    const newWaypoints = [...waypoints];
+    const generatedPoints = analyzeAndGenerateWaypoints(waypoints);
+    
+    generatedPoints.forEach((point, index) => {
+      newWaypoints.push({
+        id: `auto-${Date.now()}-${index}`,
+        name: `Auto-${index + 1}`,
+        x: point.x,
+        y: point.y,
+        type: 'corridor'
+      });
+    });
+
+    setWaypoints(newWaypoints);
+    toast({ title: `Generated ${generatedPoints.length} additional waypoints based on your pattern` });
+  };
+
+  const analyzeAndGenerateWaypoints = (existingWaypoints: Waypoint[]): {x: number, y: number}[] => {
+    const generated: {x: number, y: number}[] = [];
+    
+    // Find corridor patterns (horizontal and vertical lines)
+    const horizontalLines = findHorizontalCorridors(existingWaypoints);
+    const verticalLines = findVerticalCorridors(existingWaypoints);
+    
+    // Generate points along horizontal corridors
+    horizontalLines.forEach(line => {
+      const spacing = 40; // pixels between waypoints
+      const startX = Math.min(...line.map(p => p.x));
+      const endX = Math.max(...line.map(p => p.x));
+      const y = line[0].y;
+      
+      for (let x = startX + spacing; x < endX; x += spacing) {
+        if (!isNearExistingWaypoint(x, y, existingWaypoints)) {
+          generated.push({ x, y });
+        }
+      }
+    });
+    
+    // Generate points along vertical corridors
+    verticalLines.forEach(line => {
+      const spacing = 40;
+      const startY = Math.min(...line.map(p => p.y));
+      const endY = Math.max(...line.map(p => p.y));
+      const x = line[0].x;
+      
+      for (let y = startY + spacing; y < endY; y += spacing) {
+        if (!isNearExistingWaypoint(x, y, existingWaypoints)) {
+          generated.push({ x, y });
+        }
+      }
+    });
+    
+    // Generate intersection points
+    horizontalLines.forEach(hLine => {
+      verticalLines.forEach(vLine => {
+        const hY = hLine[0].y;
+        const vX = vLine[0].x;
+        const hMinX = Math.min(...hLine.map(p => p.x));
+        const hMaxX = Math.max(...hLine.map(p => p.x));
+        const vMinY = Math.min(...vLine.map(p => p.y));
+        const vMaxY = Math.max(...vLine.map(p => p.y));
+        
+        // Check if lines intersect
+        if (vX >= hMinX && vX <= hMaxX && hY >= vMinY && hY <= vMaxY) {
+          if (!isNearExistingWaypoint(vX, hY, existingWaypoints)) {
+            generated.push({ x: vX, y: hY });
+          }
+        }
+      });
+    });
+    
+    return generated;
+  };
+
+  const findHorizontalCorridors = (points: Waypoint[]): Waypoint[][] => {
+    const tolerance = 20; // pixels
+    const corridors: Waypoint[][] = [];
+    
+    points.forEach(point => {
+      const alignedPoints = points.filter(p => 
+        Math.abs(p.y - point.y) < tolerance && p.id !== point.id
+      );
+      
+      if (alignedPoints.length > 0) {
+        alignedPoints.push(point);
+        alignedPoints.sort((a, b) => a.x - b.x);
+        
+        // Check if this corridor already exists
+        if (!corridors.some(corridor => 
+          corridor.some(p => alignedPoints.some(ap => ap.id === p.id))
+        )) {
+          corridors.push(alignedPoints);
+        }
+      }
+    });
+    
+    return corridors;
+  };
+
+  const findVerticalCorridors = (points: Waypoint[]): Waypoint[][] => {
+    const tolerance = 20;
+    const corridors: Waypoint[][] = [];
+    
+    points.forEach(point => {
+      const alignedPoints = points.filter(p => 
+        Math.abs(p.x - point.x) < tolerance && p.id !== point.id
+      );
+      
+      if (alignedPoints.length > 0) {
+        alignedPoints.push(point);
+        alignedPoints.sort((a, b) => a.y - b.y);
+        
+        if (!corridors.some(corridor => 
+          corridor.some(p => alignedPoints.some(ap => ap.id === p.id))
+        )) {
+          corridors.push(alignedPoints);
+        }
+      }
+    });
+    
+    return corridors;
+  };
+
+  const isNearExistingWaypoint = (x: number, y: number, existing: Waypoint[]): boolean => {
+    const minDistance = 30; // pixels
+    return existing.some(wp => Math.hypot(wp.x - x, wp.y - y) < minDistance);
+  };
+
+  const clearAllWaypoints = () => {
+    setWaypoints([]);
+    setRoute([]);
+    toast({ title: "All waypoints cleared" });
+  };
+
   const deleteWaypoint = (id: string) => {
     setWaypoints(prev => prev.filter(wp => wp.id !== id));
     toast({ title: "Waypoint deleted" });
@@ -197,7 +337,28 @@ export const ImageMap = () => {
 
         {/* Waypoints List */}
         <div className="mb-4">
-          <h3 className="font-semibold mb-2">Waypoints ({waypoints.length})</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold">Waypoints ({waypoints.length})</h3>
+            <div className="flex gap-1">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={autoGenerateWaypoints}
+                disabled={waypoints.length < 3}
+              >
+                <Sparkles className="w-3 h-3 mr-1" />
+                Auto
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={clearAllWaypoints}
+                disabled={waypoints.length === 0}
+              >
+                <RotateCcw className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {waypoints.map(wp => (
               <div key={wp.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">

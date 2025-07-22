@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search } from 'lucide-react';
+import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface Waypoint {
@@ -33,6 +33,7 @@ export const ImageMap = () => {
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editingRoomName, setEditingRoomName] = useState('');
   const [roomSearchTerm, setRoomSearchTerm] = useState('');
+  const [zoom, setZoom] = useState(1);
   const imageRef = useRef<HTMLImageElement>(null);
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
@@ -208,6 +209,9 @@ export const ImageMap = () => {
     // Reset the input
     event.target.value = '';
   };
+
+  const zoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
+  const zoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
 
   // Filter rooms based on search term
   const filteredRooms = rooms.filter(room => 
@@ -397,9 +401,10 @@ export const ImageMap = () => {
               ref={imageRef}
               src="/school-floorplan.jpg" 
               alt="School Floor Plan"
-              className="max-w-full max-h-full object-contain cursor-crosshair"
+              className="max-w-full max-h-full object-contain cursor-crosshair transition-transform duration-200"
               onClick={handleImageClick}
               draggable={false}
+              style={{ transform: `scale(${zoom})` }}
             />
             
             {/* Waypoints */}
@@ -441,6 +446,31 @@ export const ImageMap = () => {
           </div>
         </div>
         
+        {/* Zoom Controls */}
+        <div className="absolute top-4 right-4 flex flex-col gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={zoomIn}
+            className="w-10 h-10 p-0 bg-background/95"
+            disabled={zoom >= 3}
+          >
+            <ZoomIn className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={zoomOut}
+            className="w-10 h-10 p-0 bg-background/95"
+            disabled={zoom <= 0.5}
+          >
+            <ZoomOut className="w-4 h-4" />
+          </Button>
+          <div className="text-xs text-center text-muted-foreground bg-background/95 px-2 py-1 rounded">
+            {Math.round(zoom * 100)}%
+          </div>
+        </div>
+
         {/* Instructions */}
         <div className="absolute top-4 left-4 bg-background/95 p-3 rounded border">
           <p className="text-sm text-muted-foreground">

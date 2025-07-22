@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Navigation, Trash2, Edit3 } from 'lucide-react';
+import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface Waypoint {
@@ -156,6 +156,58 @@ export const ImageMap = () => {
     setEditingRoomName('');
   };
 
+  const exportData = () => {
+    const data = {
+      rooms,
+      waypoints,
+      exportDate: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `floor-plan-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({ title: "Floor plan exported successfully" });
+  };
+
+  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        
+        if (data.rooms && Array.isArray(data.rooms)) {
+          setRooms(data.rooms);
+        }
+        if (data.waypoints && Array.isArray(data.waypoints)) {
+          setWaypoints(data.waypoints);
+        }
+        
+        // Clear current selection and route
+        setSelectedStart(null);
+        setSelectedEnd(null);
+        setRoute([]);
+        
+        toast({ title: "Floor plan imported successfully" });
+      } catch (error) {
+        toast({ title: "Failed to import file", variant: "destructive" });
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset the input
+    event.target.value = '';
+  };
+
   return (
     <div className="w-full h-screen flex bg-background">
       {/* Control Panel */}
@@ -199,6 +251,31 @@ export const ImageMap = () => {
               />
             </div>
           )}
+        </div>
+
+        {/* Save/Load Controls */}
+        <div className="space-y-3 mb-6">
+          <h3 className="font-semibold">Save/Load</h3>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={exportData} variant="outline">
+              <Download className="w-4 h-4 mr-1" />
+              Export
+            </Button>
+            <label className="cursor-pointer">
+              <Button size="sm" variant="outline" asChild>
+                <span>
+                  <Upload className="w-4 h-4 mr-1" />
+                  Import
+                </span>
+              </Button>
+              <input
+                type="file"
+                accept=".json"
+                onChange={importData}
+                className="hidden"
+              />
+            </label>
+          </div>
         </div>
 
         {/* Route Controls */}

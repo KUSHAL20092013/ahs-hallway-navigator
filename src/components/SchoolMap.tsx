@@ -76,6 +76,9 @@ export const SchoolMap = () => {
     );
 
     map.current.on('load', () => {
+      // Add hallway network visualization first
+      addHallwayNetworkVisualization();
+      
       // Add room markers
       schoolRooms.forEach(room => {
         const color = getRoomColor(room.type);
@@ -118,13 +121,45 @@ export const SchoolMap = () => {
         });
       });
 
-      toast.success('School map loaded! Click on rooms to plan your route.');
+      toast.success('School map loaded! Blue dots show hallway network.');
     });
 
     return () => {
       map.current?.remove();
     };
   }, [mapboxToken]);
+
+  const addHallwayNetworkVisualization = () => {
+    if (!map.current) return;
+
+    // Add hallway points as small blue markers
+    hallwayNetwork.forEach((coord, index) => {
+      const el = document.createElement('div');
+      el.className = 'hallway-marker';
+      el.style.backgroundColor = 'hsl(214, 84%, 56%)';
+      el.style.width = '8px';
+      el.style.height = '8px';
+      el.style.borderRadius = '50%';
+      el.style.border = '2px solid white';
+      el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)';
+      el.style.opacity = '0.8';
+
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat(coord)
+        .addTo(map.current!);
+
+      // Add popup showing hallway point info
+      const popup = new mapboxgl.Popup({ offset: 15 })
+        .setHTML(`
+          <div class="p-2">
+            <h4 class="font-semibold text-primary">Hallway Point ${index + 1}</h4>
+            <p class="text-xs text-muted-foreground">Corridor coordinates</p>
+          </div>
+        `);
+
+      marker.setPopup(popup);
+    });
+  };
 
   const getRoomColor = (type: Room['type']) => {
     switch (type) {

@@ -40,8 +40,8 @@ export const ImageMap = () => {
     if (!imageRef.current) return;
     
     const rect = imageRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) / zoom;
+    const y = (e.clientY - rect.top) / zoom;
 
     if (isWaypointMode && newPointName.trim()) {
       const waypoint: Waypoint = {
@@ -412,7 +412,7 @@ export const ImageMap = () => {
               <div
                 key={wp.id}
                 className="absolute w-3 h-3 bg-orange-500 border-2 border-white rounded-full shadow-lg"
-                style={{ left: wp.x - 6, top: wp.y - 6 }}
+                style={{ left: wp.x * zoom - 6, top: wp.y * zoom - 6 }}
                 title={wp.name}
               />
             ))}
@@ -425,7 +425,7 @@ export const ImageMap = () => {
                   selectedStart?.id === room.id ? 'bg-green-500' :
                   selectedEnd?.id === room.id ? 'bg-red-500' : 'bg-blue-500'
                 }`}
-                style={{ left: room.x - 8, top: room.y - 8 }}
+                style={{ left: room.x * zoom - 8, top: room.y * zoom - 8 }}
                 onClick={() => selectRoom(room)}
                 title={room.name}
               />
@@ -435,7 +435,7 @@ export const ImageMap = () => {
             {route.length > 1 && (
               <svg className="absolute inset-0 pointer-events-none">
                 <polyline
-                  points={route.map(wp => `${wp.x},${wp.y}`).join(' ')}
+                  points={route.map(wp => `${wp.x * zoom},${wp.y * zoom}`).join(' ')}
                   fill="none"
                   stroke="hsl(214, 84%, 56%)"
                   strokeWidth="3"

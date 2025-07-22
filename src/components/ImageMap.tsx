@@ -1,372 +1,297 @@
-
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { NavigationButton } from '@/components/ui/navigation-button';
-import { MapPin, Navigation, Search, Zap, ZoomIn, ZoomOut } from 'lucide-react';
-import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { MapPin, Plus, Navigation, Trash2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+
+interface Waypoint {
+  id: string;
+  name: string;
+  x: number; // Pixel coordinates on the image
+  y: number;
+  type: 'corridor' | 'junction' | 'entrance' | 'room';
+}
 
 interface Room {
   id: string;
   name: string;
-  building: string;
-  floor: number;
-  coordinates: [number, number]; // x, y coordinates on the image (percentages)
-  type: 'classroom' | 'lab' | 'office' | 'facility';
+  x: number;
+  y: number;
 }
 
-// Sample room data extracted from the floor plan
-const schoolRooms: Room[] = [
-  // Building 1 Level 1
-  { id: '101', name: 'Room 101', building: 'Building 1', floor: 1, coordinates: [25, 45], type: 'classroom' },
-  { id: '102', name: 'Room 102', building: 'Building 1', floor: 1, coordinates: [30, 45], type: 'classroom' },
-  { id: '103', name: 'Room 103', building: 'Building 1', floor: 1, coordinates: [35, 45], type: 'classroom' },
-  
-  // Building 1 Level 2
-  { id: '201', name: 'Room 201', building: 'Building 1', floor: 2, coordinates: [25, 35], type: 'classroom' },
-  { id: '202', name: 'Room 202', building: 'Building 1', floor: 2, coordinates: [30, 35], type: 'classroom' },
-  
-  // Building 2 Level 1
-  { id: '301', name: 'Room 301', building: 'Building 2', floor: 1, coordinates: [65, 45], type: 'classroom' },
-  { id: '302', name: 'Room 302', building: 'Building 2', floor: 1, coordinates: [70, 45], type: 'classroom' },
-  
-  // 700s Wing
-  { id: '701', name: 'Room 701', building: 'Main', floor: 1, coordinates: [45, 25], type: 'classroom' },
-  { id: '702', name: 'Room 702', building: 'Main', floor: 1, coordinates: [50, 25], type: 'classroom' },
-  { id: '703', name: 'Room 703', building: 'Main', floor: 1, coordinates: [55, 25], type: 'classroom' },
-  
-  // Special Facilities
-  { id: 'POOL', name: 'Swimming Pool', building: 'Athletics', floor: 1, coordinates: [80, 60], type: 'facility' },
-  { id: 'THEATRE', name: 'Theatre', building: 'Arts', floor: 1, coordinates: [20, 60], type: 'facility' },
-  { id: 'LIBRARY', name: 'Library', building: 'Main', floor: 1, coordinates: [45, 50], type: 'facility' },
-  { id: 'GYM', name: 'Gymnasium', building: 'Athletics', floor: 1, coordinates: [85, 45], type: 'facility' },
-  { id: 'LAB1', name: 'Science Lab', building: 'Main', floor: 1, coordinates: [40, 35], type: 'lab' },
-  { id: 'CAFE', name: 'Cafeteria', building: 'Main', floor: 1, coordinates: [50, 55], type: 'facility' },
-];
-
 export const ImageMap = () => {
-  const imageRef = useRef<HTMLImageElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [isWaypointMode, setIsWaypointMode] = useState(false);
+  const [isRoomMode, setIsRoomMode] = useState(false);
+  const [newPointName, setNewPointName] = useState('');
   const [selectedStart, setSelectedStart] = useState<Room | null>(null);
   const [selectedEnd, setSelectedEnd] = useState<Room | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
-  const [showSearch, setShowSearch] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [currentRoute, setCurrentRoute] = useState<any>(null);
+  const [route, setRoute] = useState<Waypoint[]>([]);
+  const imageRef = useRef<HTMLImageElement>(null);
 
-  useEffect(() => {
-    if (searchQuery) {
-      const filtered = schoolRooms.filter(room =>
-        room.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        room.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        room.building.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredRooms(filtered);
-    } else {
-      setFilteredRooms([]);
-    }
-  }, [searchQuery]);
+  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!imageRef.current) return;
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-  const getRoomColor = (type: Room['type']) => {
-    switch (type) {
-      case 'classroom': return 'hsl(214, 84%, 56%)';
-      case 'lab': return 'hsl(43, 96%, 56%)';
-      case 'office': return 'hsl(142, 76%, 36%)';
-      case 'facility': return 'hsl(0, 84%, 60%)';
-      default: return 'hsl(214, 84%, 56%)';
+    if (isWaypointMode && newPointName.trim()) {
+      const waypoint: Waypoint = {
+        id: `wp-${Date.now()}`,
+        name: newPointName.trim(),
+        x,
+        y,
+        type: 'corridor'
+      };
+      setWaypoints(prev => [...prev, waypoint]);
+      setNewPointName('');
+      toast({ title: `Waypoint "${waypoint.name}" placed` });
+    } else if (isRoomMode && newPointName.trim()) {
+      const room: Room = {
+        id: `room-${Date.now()}`,
+        name: newPointName.trim(),
+        x,
+        y
+      };
+      setRooms(prev => [...prev, room]);
+      setNewPointName('');
+      toast({ title: `Room "${room.name}" placed` });
     }
   };
 
-  const handleRoomClick = (room: Room) => {
+  const selectRoom = (room: Room) => {
     if (!selectedStart) {
       setSelectedStart(room);
-      toast.success(`Starting point set: ${room.name}`);
+      toast({ title: `Start: ${room.name}` });
     } else if (!selectedEnd && room.id !== selectedStart.id) {
       setSelectedEnd(room);
-      toast.success(`Destination set: ${room.name}`);
+      toast({ title: `Destination: ${room.name}` });
     }
   };
 
   const calculateRoute = () => {
     if (!selectedStart || !selectedEnd) {
-      toast.error('Please select both starting point and destination');
+      toast({ title: "Select both start and destination", variant: "destructive" });
       return;
     }
 
-    // Simple distance calculation for demo
-    const distance = Math.sqrt(
-      Math.pow(selectedEnd.coordinates[0] - selectedStart.coordinates[0], 2) +
-      Math.pow(selectedEnd.coordinates[1] - selectedStart.coordinates[1], 2)
-    );
+    // Simple pathfinding through waypoints (you can enhance this)
+    const startWaypoint = findNearestWaypoint(selectedStart.x, selectedStart.y);
+    const endWaypoint = findNearestWaypoint(selectedEnd.x, selectedEnd.y);
+    
+    if (!startWaypoint || !endWaypoint) {
+      toast({ title: "Need more waypoints for routing", variant: "destructive" });
+      return;
+    }
 
-    const route = {
-      distance: distance * 10, // Approximate meters
-      duration: Math.ceil(distance * 2), // Approximate seconds
-      start: selectedStart,
-      end: selectedEnd
-    };
+    // For now, simple route through nearest waypoints
+    const routePath = [startWaypoint, endWaypoint];
+    setRoute(routePath);
+    toast({ title: `Route calculated via ${routePath.length} waypoints` });
+  };
 
-    setCurrentRoute(route);
-    toast.success(`Route calculated! ${Math.round(route.distance)}m, ${route.duration}s walking`);
+  const findNearestWaypoint = (x: number, y: number): Waypoint | null => {
+    if (waypoints.length === 0) return null;
+    
+    let nearest = waypoints[0];
+    let minDistance = Math.hypot(x - nearest.x, y - nearest.y);
+    
+    for (const wp of waypoints) {
+      const distance = Math.hypot(x - wp.x, y - wp.y);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = wp;
+      }
+    }
+    
+    return nearest;
   };
 
   const clearRoute = () => {
     setSelectedStart(null);
     setSelectedEnd(null);
-    setCurrentRoute(null);
-    toast.success('Route cleared');
+    setRoute([]);
+    toast({ title: "Route cleared" });
   };
 
-  const selectRoom = (room: Room) => {
-    handleRoomClick(room);
-    setSearchQuery('');
-    setShowSearch(false);
+  const deleteWaypoint = (id: string) => {
+    setWaypoints(prev => prev.filter(wp => wp.id !== id));
+    toast({ title: "Waypoint deleted" });
   };
 
-  const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev * 1.2, 3));
-  };
-
-  const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev / 1.2, 0.5));
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      setPan({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
+  const deleteRoom = (id: string) => {
+    setRooms(prev => prev.filter(room => room.id !== id));
+    if (selectedStart?.id === id) setSelectedStart(null);
+    if (selectedEnd?.id === id) setSelectedEnd(null);
+    toast({ title: "Room deleted" });
   };
 
   return (
-    <div className="relative w-full h-screen bg-background">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <h1 className="text-lg font-bold text-foreground">American High School</h1>
-            <p className="text-sm text-muted-foreground">Navigation System</p>
+    <div className="w-full h-screen flex bg-background">
+      {/* Control Panel */}
+      <div className="w-80 p-4 border-r bg-card overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4">Floor Plan Editor</h2>
+        
+        {/* Mode Controls */}
+        <div className="space-y-3 mb-6">
+          <div className="flex gap-2">
+            <Button
+              variant={isWaypointMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setIsWaypointMode(!isWaypointMode);
+                setIsRoomMode(false);
+              }}
+            >
+              <MapPin className="w-4 h-4 mr-1" />
+              Waypoints
+            </Button>
+            <Button
+              variant={isRoomMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setIsRoomMode(!isRoomMode);
+                setIsWaypointMode(false);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Rooms
+            </Button>
           </div>
-          <NavigationButton
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSearch(!showSearch)}
-          >
-            <Search className="w-5 h-5" />
-          </NavigationButton>
+          
+          {(isWaypointMode || isRoomMode) && (
+            <div className="flex gap-2">
+              <Input
+                placeholder={`${isWaypointMode ? 'Waypoint' : 'Room'} name`}
+                value={newPointName}
+                onChange={(e) => setNewPointName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && setNewPointName('')}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Route Controls */}
+        <div className="space-y-3 mb-6">
+          <h3 className="font-semibold">Navigation</h3>
+          {selectedStart && (
+            <Badge variant="secondary">Start: {selectedStart.name}</Badge>
+          )}
+          {selectedEnd && (
+            <Badge variant="secondary">End: {selectedEnd.name}</Badge>
+          )}
+          <div className="flex gap-2">
+            <Button size="sm" onClick={calculateRoute} disabled={!selectedStart || !selectedEnd}>
+              <Navigation className="w-4 h-4 mr-1" />
+              Route
+            </Button>
+            <Button size="sm" variant="outline" onClick={clearRoute}>
+              Clear
+            </Button>
+          </div>
+        </div>
+
+        {/* Waypoints List */}
+        <div className="mb-4">
+          <h3 className="font-semibold mb-2">Waypoints ({waypoints.length})</h3>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {waypoints.map(wp => (
+              <div key={wp.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
+                <span>{wp.name}</span>
+                <Button size="sm" variant="ghost" onClick={() => deleteWaypoint(wp.id)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Rooms List */}
+        <div>
+          <h3 className="font-semibold mb-2">Rooms ({rooms.length})</h3>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {rooms.map(room => (
+              <div key={room.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
+                <span 
+                  className="cursor-pointer hover:text-primary"
+                  onClick={() => selectRoom(room)}
+                >
+                  {room.name}
+                </span>
+                <Button size="sm" variant="ghost" onClick={() => deleteRoom(room.id)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Floor Plan */}
+      <div className="flex-1 relative overflow-hidden">
+        <div className="relative w-full h-full flex items-center justify-center">
+          <div className="relative max-w-full max-h-full">
+            <img 
+              ref={imageRef}
+              src="/school-floorplan.jpg" 
+              alt="School Floor Plan"
+              className="max-w-full max-h-full object-contain cursor-crosshair"
+              onClick={handleImageClick}
+              draggable={false}
+            />
+            
+            {/* Waypoints */}
+            {waypoints.map(wp => (
+              <div
+                key={wp.id}
+                className="absolute w-3 h-3 bg-orange-500 border-2 border-white rounded-full shadow-lg"
+                style={{ left: wp.x - 6, top: wp.y - 6 }}
+                title={wp.name}
+              />
+            ))}
+            
+            {/* Rooms */}
+            {rooms.map(room => (
+              <div
+                key={room.id}
+                className={`absolute w-4 h-4 border-2 border-white rounded-full shadow-lg cursor-pointer ${
+                  selectedStart?.id === room.id ? 'bg-green-500' :
+                  selectedEnd?.id === room.id ? 'bg-red-500' : 'bg-blue-500'
+                }`}
+                style={{ left: room.x - 8, top: room.y - 8 }}
+                onClick={() => selectRoom(room)}
+                title={room.name}
+              />
+            ))}
+            
+            {/* Route Line */}
+            {route.length > 1 && (
+              <svg className="absolute inset-0 pointer-events-none">
+                <polyline
+                  points={route.map(wp => `${wp.x},${wp.y}`).join(' ')}
+                  fill="none"
+                  stroke="hsl(214, 84%, 56%)"
+                  strokeWidth="3"
+                  strokeOpacity="0.8"
+                />
+              </svg>
+            )}
+          </div>
         </div>
         
-        {/* Search Bar */}
-        {showSearch && (
-          <div className="px-4 pb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search rooms, buildings..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-              {filteredRooms.length > 0 && (
-                <Card className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto z-20">
-                  {filteredRooms.map(room => (
-                    <div
-                      key={room.id}
-                      className="p-3 hover:bg-accent cursor-pointer border-b border-border last:border-b-0"
-                      onClick={() => selectRoom(room)}
-                    >
-                      <div className="font-medium text-foreground">{room.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {room.id} • {room.building} • Floor {room.floor}
-                      </div>
-                    </div>
-                  ))}
-                </Card>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Map Container */}
-      <div 
-        ref={containerRef}
-        className="absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
-        <div 
-          className="relative"
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: 'center center',
-            transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-          }}
-        >
-          <img
-            ref={imageRef}
-            src="/school-floorplan.jpg"
-            alt="American High School Floor Plan"
-            className="w-full h-auto select-none"
-            draggable={false}
-            onLoad={() => console.log('Image loaded successfully')}
-            onError={(e) => {
-              console.error('Image failed to load:', e);
-              console.log('Trying alternative path...');
-              e.currentTarget.src = '/placeholder.svg';
-            }}
-          />
-          
-          {/* Room Markers */}
-          {schoolRooms.map(room => (
-            <div
-              key={room.id}
-              className="absolute cursor-pointer transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-transform"
-              style={{
-                left: `${room.coordinates[0]}%`,
-                top: `${room.coordinates[1]}%`,
-              }}
-              onClick={() => handleRoomClick(room)}
-            >
-              <div
-                className="w-4 h-4 rounded-full border-2 border-white shadow-lg"
-                style={{ backgroundColor: getRoomColor(room.type) }}
-              />
-              <div className="absolute top-5 left-1/2 transform -translate-x-1/2 bg-background/90 backdrop-blur-sm text-xs px-2 py-1 rounded border text-foreground whitespace-nowrap">
-                {room.name}
-              </div>
-            </div>
-          ))}
-
-          {/* Route Line */}
-          {selectedStart && selectedEnd && (
-            <svg className="absolute inset-0 w-full h-full pointer-events-none">
-              <line
-                x1={`${selectedStart.coordinates[0]}%`}
-                y1={`${selectedStart.coordinates[1]}%`}
-                x2={`${selectedEnd.coordinates[0]}%`}
-                y2={`${selectedEnd.coordinates[1]}%`}
-                stroke="hsl(214, 84%, 56%)"
-                strokeWidth="3"
-                strokeDasharray="5,5"
-                className="animate-pulse"
-              />
-            </svg>
-          )}
+        {/* Instructions */}
+        <div className="absolute top-4 left-4 bg-background/95 p-3 rounded border">
+          <p className="text-sm text-muted-foreground">
+            {isWaypointMode ? 'Click to place corridor waypoints' :
+             isRoomMode ? 'Click to place room markers' :
+             'Select mode to start placing points'}
+          </p>
         </div>
       </div>
-
-      {/* Zoom Controls */}
-      <div className="absolute top-32 right-4 z-10 flex flex-col gap-2">
-        <NavigationButton variant="outline" size="icon" onClick={handleZoomIn}>
-          <ZoomIn className="w-4 h-4" />
-        </NavigationButton>
-        <NavigationButton variant="outline" size="icon" onClick={handleZoomOut}>
-          <ZoomOut className="w-4 h-4" />
-        </NavigationButton>
-      </div>
-
-      {/* Route Info */}
-      {(selectedStart || selectedEnd) && (
-        <Card className="absolute top-32 left-4 right-20 z-10 p-4">
-          <div className="space-y-3">
-            {selectedStart && (
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-success"></div>
-                <div>
-                  <div className="font-medium text-foreground">{selectedStart.name}</div>
-                  <div className="text-sm text-muted-foreground">Starting point</div>
-                </div>
-              </div>
-            )}
-            
-            {selectedEnd && (
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-destructive"></div>
-                <div>
-                  <div className="font-medium text-foreground">{selectedEnd.name}</div>
-                  <div className="text-sm text-muted-foreground">Destination</div>
-                </div>
-              </div>
-            )}
-
-            {currentRoute && (
-              <div className="pt-2 border-t border-border">
-                <div className="text-sm text-muted-foreground">
-                  Distance: {Math.round(currentRoute.distance)}m • 
-                  ETA: {currentRoute.duration}s walking
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* Bottom Controls */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 bg-background/95 backdrop-blur-sm border-t border-border p-4">
-        <div className="flex gap-3">
-          <NavigationButton
-            onClick={calculateRoute}
-            disabled={!selectedStart || !selectedEnd}
-            className="flex-1"
-            variant="default"
-          >
-            <Navigation className="w-4 h-4 mr-2" />
-            Get Directions
-          </NavigationButton>
-          
-          {(selectedStart || selectedEnd) && (
-            <NavigationButton
-              onClick={clearRoute}
-              variant="outline"
-              size="icon"
-            >
-              <Zap className="w-4 h-4" />
-            </NavigationButton>
-          )}
-        </div>
-      </div>
-
-      {/* Legend */}
-      <Card className="absolute bottom-24 right-4 z-10 p-3">
-        <div className="text-xs font-medium text-foreground mb-2">Room Types</div>
-        <div className="space-y-1 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-primary"></div>
-            <span className="text-muted-foreground">Classroom</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-accent"></div>
-            <span className="text-muted-foreground">Lab</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-success"></div>
-            <span className="text-muted-foreground">Office</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-destructive"></div>
-            <span className="text-muted-foreground">Facility</span>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 };

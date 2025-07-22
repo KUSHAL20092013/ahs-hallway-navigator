@@ -118,144 +118,214 @@ export const ImageMap = () => {
     toast({ title: "Route cleared" });
   };
 
-  const autoGenerateWaypoints = () => {
-    if (waypoints.length < 3) {
-      toast({ title: "Place at least 3 waypoints first to establish patterns", variant: "destructive" });
+  const autoGenerateRooms = () => {
+    if (rooms.length < 3) {
+      toast({ title: "Place at least 3 rooms first to establish patterns", variant: "destructive" });
       return;
     }
 
-    const newWaypoints = [...waypoints];
-    const generatedPoints = analyzeAndGenerateWaypoints(waypoints);
+    const newRooms = [...rooms];
+    const generatedRooms = analyzeAndGenerateRooms(rooms);
     
-    generatedPoints.forEach((point, index) => {
-      newWaypoints.push({
-        id: `auto-${Date.now()}-${index}`,
-        name: `Auto-${index + 1}`,
-        x: point.x,
-        y: point.y,
-        type: 'corridor'
+    generatedRooms.forEach((room, index) => {
+      newRooms.push({
+        id: `auto-room-${Date.now()}-${index}`,
+        name: room.name,
+        x: room.x,
+        y: room.y
       });
     });
 
-    setWaypoints(newWaypoints);
-    toast({ title: `Generated ${generatedPoints.length} additional waypoints based on your pattern` });
+    setRooms(newRooms);
+    toast({ title: `Generated ${generatedRooms.length} additional rooms based on your pattern` });
   };
 
-  const analyzeAndGenerateWaypoints = (existingWaypoints: Waypoint[]): {x: number, y: number}[] => {
-    const generated: {x: number, y: number}[] = [];
+  const analyzeAndGenerateRooms = (existingRooms: Room[]): {name: string, x: number, y: number}[] => {
+    const generated: {name: string, x: number, y: number}[] = [];
     
-    // Find corridor patterns (horizontal and vertical lines)
-    const horizontalLines = findHorizontalCorridors(existingWaypoints);
-    const verticalLines = findVerticalCorridors(existingWaypoints);
+    // Analyze room spacing patterns
+    const roomRows = findRoomRows(existingRooms);
+    const roomColumns = findRoomColumns(existingRooms);
     
-    // Generate points along horizontal corridors
-    horizontalLines.forEach(line => {
-      const spacing = 40; // pixels between waypoints
-      const startX = Math.min(...line.map(p => p.x));
-      const endX = Math.max(...line.map(p => p.x));
-      const y = line[0].y;
+    // Generate rooms along detected rows
+    roomRows.forEach((row, rowIndex) => {
+      const avgSpacing = calculateAverageSpacing(row.map(r => r.x));
+      const y = row[0].y;
+      const minX = Math.min(...row.map(r => r.x));
+      const maxX = Math.max(...row.map(r => r.x));
       
-      for (let x = startX + spacing; x < endX; x += spacing) {
-        if (!isNearExistingWaypoint(x, y, existingWaypoints)) {
-          generated.push({ x, y });
+      // Extend row in both directions
+      for (let x = minX - avgSpacing; x > 50; x -= avgSpacing) {
+        if (!isNearExistingRoom(x, y, existingRooms)) {
+          generated.push({
+            name: generateRoomName(x, y, existingRooms),
+            x, y
+          });
         }
       }
-    });
-    
-    // Generate points along vertical corridors
-    verticalLines.forEach(line => {
-      const spacing = 40;
-      const startY = Math.min(...line.map(p => p.y));
-      const endY = Math.max(...line.map(p => p.y));
-      const x = line[0].x;
       
-      for (let y = startY + spacing; y < endY; y += spacing) {
-        if (!isNearExistingWaypoint(x, y, existingWaypoints)) {
-          generated.push({ x, y });
+      for (let x = maxX + avgSpacing; x < 800; x += avgSpacing) {
+        if (!isNearExistingRoom(x, y, existingRooms)) {
+          generated.push({
+            name: generateRoomName(x, y, existingRooms),
+            x, y
+          });
         }
       }
-    });
-    
-    // Generate intersection points
-    horizontalLines.forEach(hLine => {
-      verticalLines.forEach(vLine => {
-        const hY = hLine[0].y;
-        const vX = vLine[0].x;
-        const hMinX = Math.min(...hLine.map(p => p.x));
-        const hMaxX = Math.max(...hLine.map(p => p.x));
-        const vMinY = Math.min(...vLine.map(p => p.y));
-        const vMaxY = Math.max(...vLine.map(p => p.y));
-        
-        // Check if lines intersect
-        if (vX >= hMinX && vX <= hMaxX && hY >= vMinY && hY <= vMaxY) {
-          if (!isNearExistingWaypoint(vX, hY, existingWaypoints)) {
-            generated.push({ x: vX, y: hY });
+      
+      // Fill gaps in the row
+      for (let i = 0; i < row.length - 1; i++) {
+        const gap = row[i + 1].x - row[i].x;
+        if (gap > avgSpacing * 1.5) {
+          const x = row[i].x + avgSpacing;
+          if (!isNearExistingRoom(x, y, existingRooms)) {
+            generated.push({
+              name: generateRoomName(x, y, existingRooms),
+              x, y
+            });
           }
         }
-      });
+      }
+    });
+    
+    // Generate rooms along detected columns
+    roomColumns.forEach((column) => {
+      const avgSpacing = calculateAverageSpacing(column.map(r => r.y));
+      const x = column[0].x;
+      const minY = Math.min(...column.map(r => r.y));
+      const maxY = Math.max(...column.map(r => r.y));
+      
+      // Extend column in both directions
+      for (let y = minY - avgSpacing; y > 50; y -= avgSpacing) {
+        if (!isNearExistingRoom(x, y, existingRooms)) {
+          generated.push({
+            name: generateRoomName(x, y, existingRooms),
+            x, y
+          });
+        }
+      }
+      
+      for (let y = maxY + avgSpacing; y < 600; y += avgSpacing) {
+        if (!isNearExistingRoom(x, y, existingRooms)) {
+          generated.push({
+            name: generateRoomName(x, y, existingRooms),
+            x, y
+          });
+        }
+      }
     });
     
     return generated;
   };
 
-  const findHorizontalCorridors = (points: Waypoint[]): Waypoint[][] => {
-    const tolerance = 20; // pixels
-    const corridors: Waypoint[][] = [];
+  const findRoomRows = (rooms: Room[]): Room[][] => {
+    const tolerance = 25; // pixels
+    const rows: Room[][] = [];
     
-    points.forEach(point => {
-      const alignedPoints = points.filter(p => 
-        Math.abs(p.y - point.y) < tolerance && p.id !== point.id
+    rooms.forEach(room => {
+      const alignedRooms = rooms.filter(r => 
+        Math.abs(r.y - room.y) < tolerance && r.id !== room.id
       );
       
-      if (alignedPoints.length > 0) {
-        alignedPoints.push(point);
-        alignedPoints.sort((a, b) => a.x - b.x);
+      if (alignedRooms.length > 0) {
+        alignedRooms.push(room);
+        alignedRooms.sort((a, b) => a.x - b.x);
         
-        // Check if this corridor already exists
-        if (!corridors.some(corridor => 
-          corridor.some(p => alignedPoints.some(ap => ap.id === p.id))
+        // Check if this row already exists
+        if (!rows.some(row => 
+          row.some(r => alignedRooms.some(ar => ar.id === r.id))
         )) {
-          corridors.push(alignedPoints);
+          rows.push(alignedRooms);
         }
       }
     });
     
-    return corridors;
+    return rows;
   };
 
-  const findVerticalCorridors = (points: Waypoint[]): Waypoint[][] => {
-    const tolerance = 20;
-    const corridors: Waypoint[][] = [];
+  const findRoomColumns = (rooms: Room[]): Room[][] => {
+    const tolerance = 25;
+    const columns: Room[][] = [];
     
-    points.forEach(point => {
-      const alignedPoints = points.filter(p => 
-        Math.abs(p.x - point.x) < tolerance && p.id !== point.id
+    rooms.forEach(room => {
+      const alignedRooms = rooms.filter(r => 
+        Math.abs(r.x - room.x) < tolerance && r.id !== room.id
       );
       
-      if (alignedPoints.length > 0) {
-        alignedPoints.push(point);
-        alignedPoints.sort((a, b) => a.y - b.y);
+      if (alignedRooms.length > 0) {
+        alignedRooms.push(room);
+        alignedRooms.sort((a, b) => a.y - b.y);
         
-        if (!corridors.some(corridor => 
-          corridor.some(p => alignedPoints.some(ap => ap.id === p.id))
+        if (!columns.some(column => 
+          column.some(r => alignedRooms.some(ar => ar.id === r.id))
         )) {
-          corridors.push(alignedPoints);
+          columns.push(alignedRooms);
         }
       }
     });
     
-    return corridors;
+    return columns;
   };
 
-  const isNearExistingWaypoint = (x: number, y: number, existing: Waypoint[]): boolean => {
-    const minDistance = 30; // pixels
-    return existing.some(wp => Math.hypot(wp.x - x, wp.y - y) < minDistance);
+  const calculateAverageSpacing = (positions: number[]): number => {
+    if (positions.length < 2) return 60; // default spacing
+    
+    const sortedPositions = [...positions].sort((a, b) => a - b);
+    const spacings = [];
+    
+    for (let i = 1; i < sortedPositions.length; i++) {
+      spacings.push(sortedPositions[i] - sortedPositions[i - 1]);
+    }
+    
+    const avgSpacing = spacings.reduce((sum, spacing) => sum + spacing, 0) / spacings.length;
+    return Math.max(40, Math.min(100, avgSpacing)); // clamp between 40-100 pixels
   };
 
-  const clearAllWaypoints = () => {
-    setWaypoints([]);
+  const generateRoomName = (x: number, y: number, existingRooms: Room[]): string => {
+    // Try to extract room naming pattern from existing rooms
+    const roomNumbers = existingRooms
+      .map(r => r.name.match(/\d+/))
+      .filter(match => match)
+      .map(match => parseInt(match![0]))
+      .sort((a, b) => a - b);
+    
+    if (roomNumbers.length > 0) {
+      // Find the next available number in sequence
+      let nextNumber = roomNumbers[roomNumbers.length - 1] + 1;
+      
+      // Check if this number is already used
+      while (existingRooms.some(r => r.name.includes(nextNumber.toString()))) {
+        nextNumber++;
+      }
+      
+      // Try to detect building prefix pattern
+      const buildingPrefixes = existingRooms
+        .map(r => r.name.match(/^[A-Z]+/))
+        .filter(match => match)
+        .map(match => match![0]);
+      
+      if (buildingPrefixes.length > 0) {
+        const commonPrefix = buildingPrefixes[0];
+        return `${commonPrefix}${nextNumber}`;
+      }
+      
+      return `Room ${nextNumber}`;
+    }
+    
+    return `Room ${Math.floor(Math.random() * 900) + 100}`;
+  };
+
+  const isNearExistingRoom = (x: number, y: number, existing: Room[]): boolean => {
+    const minDistance = 35; // pixels
+    return existing.some(room => Math.hypot(room.x - x, room.y - y) < minDistance);
+  };
+
+  const clearAllRooms = () => {
+    setRooms([]);
+    setSelectedStart(null);
+    setSelectedEnd(null);
     setRoute([]);
-    toast({ title: "All waypoints cleared" });
+    toast({ title: "All rooms cleared" });
   };
 
   const deleteWaypoint = (id: string) => {
@@ -339,25 +409,6 @@ export const ImageMap = () => {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold">Waypoints ({waypoints.length})</h3>
-            <div className="flex gap-1">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={autoGenerateWaypoints}
-                disabled={waypoints.length < 3}
-              >
-                <Sparkles className="w-3 h-3 mr-1" />
-                Auto
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={clearAllWaypoints}
-                disabled={waypoints.length === 0}
-              >
-                <RotateCcw className="w-3 h-3" />
-              </Button>
-            </div>
           </div>
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {waypoints.map(wp => (
@@ -373,7 +424,28 @@ export const ImageMap = () => {
 
         {/* Rooms List */}
         <div>
-          <h3 className="font-semibold mb-2">Rooms ({rooms.length})</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold">Rooms ({rooms.length})</h3>
+            <div className="flex gap-1">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={autoGenerateRooms}
+                disabled={rooms.length < 3}
+              >
+                <Sparkles className="w-3 h-3 mr-1" />
+                Auto
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={clearAllRooms}
+                disabled={rooms.length === 0}
+              >
+                <RotateCcw className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {rooms.map(room => (
               <div key={room.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">

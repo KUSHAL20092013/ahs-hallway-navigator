@@ -223,7 +223,7 @@ export const ImageMap = () => {
         >
           <img
             ref={imageRef}
-            src="/placeholder.svg"
+            src="/school-floorplan.jpg"
             alt="American High School Floor Plan"
             className="w-full h-auto select-none"
             draggable={false}

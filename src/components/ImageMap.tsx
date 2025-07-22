@@ -227,6 +227,12 @@ export const ImageMap = () => {
             alt="American High School Floor Plan"
             className="w-full h-auto select-none"
             draggable={false}
+            onLoad={() => console.log('Image loaded successfully')}
+            onError={(e) => {
+              console.error('Image failed to load:', e);
+              console.log('Trying alternative path...');
+              e.currentTarget.src = '/placeholder.svg';
+            }}
           />
           
           {/* Room Markers */}

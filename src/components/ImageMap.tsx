@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload } from 'lucide-react';
+import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface Waypoint {
@@ -32,6 +32,7 @@ export const ImageMap = () => {
   const [route, setRoute] = useState<Waypoint[]>([]);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editingRoomName, setEditingRoomName] = useState('');
+  const [roomSearchTerm, setRoomSearchTerm] = useState('');
   const imageRef = useRef<HTMLImageElement>(null);
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
@@ -208,6 +209,11 @@ export const ImageMap = () => {
     event.target.value = '';
   };
 
+  // Filter rooms based on search term
+  const filteredRooms = rooms.filter(room => 
+    room.name.toLowerCase().includes(roomSearchTerm.toLowerCase())
+  );
+
   return (
     <div className="w-full h-screen flex bg-background">
       {/* Control Panel */}
@@ -317,9 +323,23 @@ export const ImageMap = () => {
 
         {/* Rooms List */}
         <div>
-          <h3 className="font-semibold mb-2">Rooms ({rooms.length})</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold">Rooms ({rooms.length})</h3>
+          </div>
+          
+          {/* Room Search */}
+          <div className="relative mb-3">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search rooms..."
+              value={roomSearchTerm}
+              onChange={(e) => setRoomSearchTerm(e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
+          
           <div className="space-y-1 max-h-32 overflow-y-auto">
-            {rooms.map(room => (
+            {filteredRooms.map(room => (
               <div key={room.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
                 {editingRoomId === room.id ? (
                   <div className="flex items-center gap-2 flex-1">

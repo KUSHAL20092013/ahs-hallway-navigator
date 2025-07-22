@@ -121,7 +121,7 @@ export const SchoolMap = () => {
         });
       });
 
-      toast.success('School map loaded! Blue dots show hallway network.');
+      toast.success(`School map loaded! Orange dots show ${hallwayNetwork.length} hallway points.`);
     });
 
     return () => {
@@ -132,17 +132,19 @@ export const SchoolMap = () => {
   const addHallwayNetworkVisualization = () => {
     if (!map.current) return;
 
-    // Add hallway points as small blue markers
+    // Add hallway points as orange markers (more visible)
     hallwayNetwork.forEach((coord, index) => {
       const el = document.createElement('div');
       el.className = 'hallway-marker';
-      el.style.backgroundColor = 'hsl(214, 84%, 56%)';
-      el.style.width = '8px';
-      el.style.height = '8px';
+      el.style.backgroundColor = 'hsl(24, 96%, 56%)'; // Orange color
+      el.style.width = '12px';  // Made larger
+      el.style.height = '12px'; // Made larger
       el.style.borderRadius = '50%';
       el.style.border = '2px solid white';
-      el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)';
-      el.style.opacity = '0.8';
+      el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+      el.style.opacity = '1'; // Full opacity
+      el.style.zIndex = '1000'; // Higher z-index
+      el.style.cursor = 'pointer';
 
       const marker = new mapboxgl.Marker(el)
         .setLngLat(coord)
@@ -153,12 +155,14 @@ export const SchoolMap = () => {
         .setHTML(`
           <div class="p-2">
             <h4 class="font-semibold text-primary">Hallway Point ${index + 1}</h4>
-            <p class="text-xs text-muted-foreground">Corridor coordinates</p>
+            <p class="text-xs text-muted-foreground">Coords: ${coord[0].toFixed(4)}, ${coord[1].toFixed(4)}</p>
           </div>
         `);
 
       marker.setPopup(popup);
     });
+
+    console.log(`Added ${hallwayNetwork.length} orange hallway markers to map`);
   };
 
   const getRoomColor = (type: Room['type']) => {

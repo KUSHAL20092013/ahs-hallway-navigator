@@ -142,12 +142,16 @@ export const SchoolMap = () => {
       return;
     }
 
-    // Simple straight-line route for demo (in real app, use routing API)
+// Calculate route that follows hallways instead of going through walls
+    const pathCoordinates = calculateHallwayPath(selectedStart.coordinates, selectedEnd.coordinates);
+    const totalDistance = calculatePathDistance(pathCoordinates);
+    
     const route = {
-      distance: getDistance(selectedStart.coordinates, selectedEnd.coordinates),
-      duration: Math.ceil(getDistance(selectedStart.coordinates, selectedEnd.coordinates) * 1000 / 5), // Assume 5 km/h walking speed
+      distance: totalDistance,
+      duration: Math.ceil(totalDistance * 1000 / 1.4), // 1.4 m/s walking speed
       start: selectedStart,
-      end: selectedEnd
+      end: selectedEnd,
+      path: pathCoordinates
     };
 
     setCurrentRoute(route);
@@ -167,7 +171,7 @@ export const SchoolMap = () => {
           properties: {},
           geometry: {
             type: 'LineString',
-            coordinates: [selectedStart.coordinates, selectedEnd.coordinates]
+            coordinates: pathCoordinates
           }
         }
       });
@@ -187,11 +191,9 @@ export const SchoolMap = () => {
         }
       });
 
-      // Fit map to show route
-      const bounds = new mapboxgl.LngLatBounds()
-        .extend(selectedStart.coordinates)
-        .extend(selectedEnd.coordinates);
-      
+      // Fit map to show entire route
+      const bounds = new mapboxgl.LngLatBounds();
+      pathCoordinates.forEach(coord => bounds.extend(coord));
       map.current.fitBounds(bounds, { padding: 50 });
     }
 
@@ -207,6 +209,96 @@ export const SchoolMap = () => {
       Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
+  };
+
+  // Define hallway network - main corridors connecting different areas
+  const hallwayNetwork: [number, number][] = [
+    // Main entrance and central corridor
+    [-122.4194, 37.7749], // School center/entrance
+    [-122.4190, 37.7755], // Central corridor north
+    [-122.4185, 37.7760], // Junction to building A
+    [-122.4180, 37.7765], // Building A corridor
+    [-122.4175, 37.7770], // Building A upper level
+    
+    // Corridor to building B
+    [-122.4194, 37.7749], // Back to center
+    [-122.4170, 37.7775], // Junction to building B
+    [-122.4165, 37.7780], // Building B corridor
+    [-122.4160, 37.7785], // Building B labs area
+    
+    // Corridor to building C and facilities
+    [-122.4194, 37.7749], // Back to center
+    [-122.4150, 37.7795], // Building C corridor
+    [-122.4145, 37.7800], // Art studio area
+    
+    // Facilities corridor
+    [-122.4194, 37.7749], // Back to center
+    [-122.4140, 37.7805], // Cafeteria corridor
+    [-122.4130, 37.7815], // Athletics area
+    [-122.4120, 37.7825], // Gym area
+    
+    // Admin and library corridor
+    [-122.4194, 37.7749], // Back to center
+    [-122.4115, 37.7830], // Library area
+    [-122.4110, 37.7835], // Admin corridor
+    [-122.4105, 37.7840], // Principal office
+  ];
+
+  const calculateHallwayPath = (start: [number, number], end: [number, number]): [number, number][] => {
+    // Find closest hallway points to start and end
+    const startHallway = findClosestHallwayPoint(start);
+    const endHallway = findClosestHallwayPoint(end);
+    
+    // Create path: room -> closest hallway -> center -> target hallway -> target room
+    const path: [number, number][] = [start];
+    
+    if (startHallway && !coordinatesEqual(start, startHallway)) {
+      path.push(startHallway);
+    }
+    
+    // Add center point for routing between different building sections
+    const center: [number, number] = [-122.4194, 37.7749];
+    if (startHallway && endHallway && 
+        !coordinatesEqual(startHallway, endHallway) && 
+        !coordinatesEqual(startHallway, center) && 
+        !coordinatesEqual(endHallway, center)) {
+      path.push(center);
+    }
+    
+    if (endHallway && !coordinatesEqual(end, endHallway) && !coordinatesEqual(startHallway, endHallway)) {
+      path.push(endHallway);
+    }
+    
+    path.push(end);
+    
+    return path;
+  };
+
+  const findClosestHallwayPoint = (coord: [number, number]): [number, number] | null => {
+    let closest = hallwayNetwork[0];
+    let minDistance = getDistance(coord, closest);
+    
+    for (const hallwayPoint of hallwayNetwork) {
+      const distance = getDistance(coord, hallwayPoint);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = hallwayPoint;
+      }
+    }
+    
+    return closest;
+  };
+
+  const coordinatesEqual = (coord1: [number, number], coord2: [number, number]): boolean => {
+    return Math.abs(coord1[0] - coord2[0]) < 0.0001 && Math.abs(coord1[1] - coord2[1]) < 0.0001;
+  };
+
+  const calculatePathDistance = (path: [number, number][]): number => {
+    let totalDistance = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+      totalDistance += getDistance(path[i], path[i + 1]);
+    }
+    return totalDistance;
   };
 
   const clearRoute = () => {

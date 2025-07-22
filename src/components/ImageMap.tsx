@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Navigation, Trash2 } from 'lucide-react';
+import { MapPin, Plus, Navigation, Trash2, Edit3 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface Waypoint {
@@ -30,6 +30,8 @@ export const ImageMap = () => {
   const [selectedStart, setSelectedStart] = useState<Room | null>(null);
   const [selectedEnd, setSelectedEnd] = useState<Room | null>(null);
   const [route, setRoute] = useState<Waypoint[]>([]);
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+  const [editingRoomName, setEditingRoomName] = useState('');
   const imageRef = useRef<HTMLImageElement>(null);
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
@@ -131,6 +133,29 @@ export const ImageMap = () => {
     toast({ title: "Room deleted" });
   };
 
+  const startEditingRoom = (room: Room) => {
+    setEditingRoomId(room.id);
+    setEditingRoomName(room.name);
+  };
+
+  const saveRoomEdit = () => {
+    if (editingRoomId && editingRoomName.trim()) {
+      setRooms(prev => prev.map(room => 
+        room.id === editingRoomId 
+          ? { ...room, name: editingRoomName.trim() }
+          : room
+      ));
+      setEditingRoomId(null);
+      setEditingRoomName('');
+      toast({ title: "Room renamed" });
+    }
+  };
+
+  const cancelRoomEdit = () => {
+    setEditingRoomId(null);
+    setEditingRoomName('');
+  };
+
   return (
     <div className="w-full h-screen flex bg-background">
       {/* Control Panel */}
@@ -219,15 +244,48 @@ export const ImageMap = () => {
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {rooms.map(room => (
               <div key={room.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
-                <span 
-                  className="cursor-pointer hover:text-primary"
-                  onClick={() => selectRoom(room)}
-                >
-                  {room.name}
-                </span>
-                <Button size="sm" variant="ghost" onClick={() => deleteRoom(room.id)}>
-                  <Trash2 className="w-3 h-3" />
-                </Button>
+                {editingRoomId === room.id ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <Input
+                      value={editingRoomName}
+                      onChange={(e) => setEditingRoomName(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') saveRoomEdit();
+                        if (e.key === 'Escape') cancelRoomEdit();
+                      }}
+                      onBlur={saveRoomEdit}
+                      className="h-6 text-xs"
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <span 
+                    className="cursor-pointer hover:text-primary flex-1"
+                    onClick={() => selectRoom(room)}
+                  >
+                    {room.name}
+                  </span>
+                )}
+                <div className="flex gap-1">
+                  {editingRoomId !== room.id && (
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => startEditingRoom(room)}
+                      className="h-6 w-6 p-0"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                    </Button>
+                  )}
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => deleteRoom(room.id)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

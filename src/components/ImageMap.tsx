@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Navigation, Trash2, Sparkles, RotateCcw } from 'lucide-react';
+import { MapPin, Plus, Navigation, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface Waypoint {
@@ -50,16 +50,16 @@ export const ImageMap = () => {
       setWaypoints(prev => [...prev, waypoint]);
       setNewPointName('');
       toast({ title: `Waypoint "${waypoint.name}" placed` });
-    } else if (isRoomMode && newPointName.trim()) {
+    } else if (isRoomMode) {
+      const roomNumber = rooms.length + 1;
       const room: Room = {
         id: `room-${Date.now()}`,
-        name: newPointName.trim(),
+        name: roomNumber.toString(),
         x,
         y
       };
       setRooms(prev => [...prev, room]);
-      setNewPointName('');
-      toast({ title: `Room "${room.name}" placed` });
+      toast({ title: `Room ${roomNumber} placed` });
     }
   };
 
@@ -118,215 +118,6 @@ export const ImageMap = () => {
     toast({ title: "Route cleared" });
   };
 
-  const autoGenerateRooms = () => {
-    if (rooms.length < 3) {
-      toast({ title: "Place at least 3 rooms first to establish patterns", variant: "destructive" });
-      return;
-    }
-
-    const newRooms = [...rooms];
-    const generatedRooms = analyzeAndGenerateRooms(rooms);
-    
-    generatedRooms.forEach((room, index) => {
-      newRooms.push({
-        id: `auto-room-${Date.now()}-${index}`,
-        name: room.name,
-        x: room.x,
-        y: room.y
-      });
-    });
-
-    setRooms(newRooms);
-    toast({ title: `Generated ${generatedRooms.length} additional rooms based on your pattern` });
-  };
-
-  const analyzeAndGenerateRooms = (existingRooms: Room[]): {name: string, x: number, y: number}[] => {
-    const generated: {name: string, x: number, y: number}[] = [];
-    
-    // Analyze room spacing patterns
-    const roomRows = findRoomRows(existingRooms);
-    const roomColumns = findRoomColumns(existingRooms);
-    
-    // Generate rooms along detected rows
-    roomRows.forEach((row, rowIndex) => {
-      const avgSpacing = calculateAverageSpacing(row.map(r => r.x));
-      const y = row[0].y;
-      const minX = Math.min(...row.map(r => r.x));
-      const maxX = Math.max(...row.map(r => r.x));
-      
-      // Extend row in both directions
-      for (let x = minX - avgSpacing; x > 50; x -= avgSpacing) {
-        if (!isNearExistingRoom(x, y, existingRooms)) {
-          generated.push({
-            name: generateRoomName(x, y, existingRooms),
-            x, y
-          });
-        }
-      }
-      
-      for (let x = maxX + avgSpacing; x < 800; x += avgSpacing) {
-        if (!isNearExistingRoom(x, y, existingRooms)) {
-          generated.push({
-            name: generateRoomName(x, y, existingRooms),
-            x, y
-          });
-        }
-      }
-      
-      // Fill gaps in the row
-      for (let i = 0; i < row.length - 1; i++) {
-        const gap = row[i + 1].x - row[i].x;
-        if (gap > avgSpacing * 1.5) {
-          const x = row[i].x + avgSpacing;
-          if (!isNearExistingRoom(x, y, existingRooms)) {
-            generated.push({
-              name: generateRoomName(x, y, existingRooms),
-              x, y
-            });
-          }
-        }
-      }
-    });
-    
-    // Generate rooms along detected columns
-    roomColumns.forEach((column) => {
-      const avgSpacing = calculateAverageSpacing(column.map(r => r.y));
-      const x = column[0].x;
-      const minY = Math.min(...column.map(r => r.y));
-      const maxY = Math.max(...column.map(r => r.y));
-      
-      // Extend column in both directions
-      for (let y = minY - avgSpacing; y > 50; y -= avgSpacing) {
-        if (!isNearExistingRoom(x, y, existingRooms)) {
-          generated.push({
-            name: generateRoomName(x, y, existingRooms),
-            x, y
-          });
-        }
-      }
-      
-      for (let y = maxY + avgSpacing; y < 600; y += avgSpacing) {
-        if (!isNearExistingRoom(x, y, existingRooms)) {
-          generated.push({
-            name: generateRoomName(x, y, existingRooms),
-            x, y
-          });
-        }
-      }
-    });
-    
-    return generated;
-  };
-
-  const findRoomRows = (rooms: Room[]): Room[][] => {
-    const tolerance = 25; // pixels
-    const rows: Room[][] = [];
-    
-    rooms.forEach(room => {
-      const alignedRooms = rooms.filter(r => 
-        Math.abs(r.y - room.y) < tolerance && r.id !== room.id
-      );
-      
-      if (alignedRooms.length > 0) {
-        alignedRooms.push(room);
-        alignedRooms.sort((a, b) => a.x - b.x);
-        
-        // Check if this row already exists
-        if (!rows.some(row => 
-          row.some(r => alignedRooms.some(ar => ar.id === r.id))
-        )) {
-          rows.push(alignedRooms);
-        }
-      }
-    });
-    
-    return rows;
-  };
-
-  const findRoomColumns = (rooms: Room[]): Room[][] => {
-    const tolerance = 25;
-    const columns: Room[][] = [];
-    
-    rooms.forEach(room => {
-      const alignedRooms = rooms.filter(r => 
-        Math.abs(r.x - room.x) < tolerance && r.id !== room.id
-      );
-      
-      if (alignedRooms.length > 0) {
-        alignedRooms.push(room);
-        alignedRooms.sort((a, b) => a.y - b.y);
-        
-        if (!columns.some(column => 
-          column.some(r => alignedRooms.some(ar => ar.id === r.id))
-        )) {
-          columns.push(alignedRooms);
-        }
-      }
-    });
-    
-    return columns;
-  };
-
-  const calculateAverageSpacing = (positions: number[]): number => {
-    if (positions.length < 2) return 60; // default spacing
-    
-    const sortedPositions = [...positions].sort((a, b) => a - b);
-    const spacings = [];
-    
-    for (let i = 1; i < sortedPositions.length; i++) {
-      spacings.push(sortedPositions[i] - sortedPositions[i - 1]);
-    }
-    
-    const avgSpacing = spacings.reduce((sum, spacing) => sum + spacing, 0) / spacings.length;
-    return Math.max(40, Math.min(100, avgSpacing)); // clamp between 40-100 pixels
-  };
-
-  const generateRoomName = (x: number, y: number, existingRooms: Room[]): string => {
-    // Try to extract room naming pattern from existing rooms
-    const roomNumbers = existingRooms
-      .map(r => r.name.match(/\d+/))
-      .filter(match => match)
-      .map(match => parseInt(match![0]))
-      .sort((a, b) => a - b);
-    
-    if (roomNumbers.length > 0) {
-      // Find the next available number in sequence
-      let nextNumber = roomNumbers[roomNumbers.length - 1] + 1;
-      
-      // Check if this number is already used
-      while (existingRooms.some(r => r.name.includes(nextNumber.toString()))) {
-        nextNumber++;
-      }
-      
-      // Try to detect building prefix pattern
-      const buildingPrefixes = existingRooms
-        .map(r => r.name.match(/^[A-Z]+/))
-        .filter(match => match)
-        .map(match => match![0]);
-      
-      if (buildingPrefixes.length > 0) {
-        const commonPrefix = buildingPrefixes[0];
-        return `${commonPrefix}${nextNumber}`;
-      }
-      
-      return `Room ${nextNumber}`;
-    }
-    
-    return `Room ${Math.floor(Math.random() * 900) + 100}`;
-  };
-
-  const isNearExistingRoom = (x: number, y: number, existing: Room[]): boolean => {
-    const minDistance = 35; // pixels
-    return existing.some(room => Math.hypot(room.x - x, room.y - y) < minDistance);
-  };
-
-  const clearAllRooms = () => {
-    setRooms([]);
-    setSelectedStart(null);
-    setSelectedEnd(null);
-    setRoute([]);
-    toast({ title: "All rooms cleared" });
-  };
 
   const deleteWaypoint = (id: string) => {
     setWaypoints(prev => prev.filter(wp => wp.id !== id));
@@ -373,10 +164,10 @@ export const ImageMap = () => {
             </Button>
           </div>
           
-          {(isWaypointMode || isRoomMode) && (
+          {isWaypointMode && (
             <div className="flex gap-2">
               <Input
-                placeholder={`${isWaypointMode ? 'Waypoint' : 'Room'} name`}
+                placeholder="Waypoint name"
                 value={newPointName}
                 onChange={(e) => setNewPointName(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && setNewPointName('')}
@@ -424,28 +215,7 @@ export const ImageMap = () => {
 
         {/* Rooms List */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold">Rooms ({rooms.length})</h3>
-            <div className="flex gap-1">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={autoGenerateRooms}
-                disabled={rooms.length < 3}
-              >
-                <Sparkles className="w-3 h-3 mr-1" />
-                Auto
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={clearAllRooms}
-                disabled={rooms.length === 0}
-              >
-                <RotateCcw className="w-3 h-3" />
-              </Button>
-            </div>
-          </div>
+          <h3 className="font-semibold mb-2">Rooms ({rooms.length})</h3>
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {rooms.map(room => (
               <div key={room.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
@@ -519,8 +289,8 @@ export const ImageMap = () => {
         {/* Instructions */}
         <div className="absolute top-4 left-4 bg-background/95 p-3 rounded border">
           <p className="text-sm text-muted-foreground">
-            {isWaypointMode ? 'Click to place corridor waypoints' :
-             isRoomMode ? 'Click to place room markers' :
+            {isWaypointMode ? 'Enter waypoint name, then click to place corridor points' :
+             isRoomMode ? 'Click to place rooms (auto-numbered 1, 2, 3...)' :
              'Select mode to start placing points'}
           </p>
         </div>

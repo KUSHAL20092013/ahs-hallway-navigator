@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,24 +41,41 @@ export const ImageMap = () => {
     if (!imageRef.current) return;
     
     const rect = imageRef.current.getBoundingClientRect();
-    const imageNaturalWidth = imageRef.current.naturalWidth;
-    const imageNaturalHeight = imageRef.current.naturalHeight;
-    const imageDisplayWidth = rect.width / zoom;
-    const imageDisplayHeight = rect.height / zoom;
     
-    // Calculate the offset due to centering
-    const offsetX = (rect.width - imageDisplayWidth * zoom) / 2;
-    const offsetY = (rect.height - imageDisplayHeight * zoom) / 2;
+    // Get click position relative to the container
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
     
-    const x = (e.clientX - rect.left - offsetX) / zoom;
-    const y = (e.clientY - rect.top - offsetY) / zoom;
+    // Calculate the actual image dimensions as displayed (before scaling)
+    const naturalWidth = imageRef.current.naturalWidth;
+    const naturalHeight = imageRef.current.naturalHeight;
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
+    
+    // Calculate how the image is actually displayed (object-contain behavior)
+    const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
+    const displayedWidth = naturalWidth * scale;
+    const displayedHeight = naturalHeight * scale;
+    
+    // Calculate centering offsets
+    const offsetX = (containerWidth - displayedWidth) / 2;
+    const offsetY = (containerHeight - displayedHeight) / 2;
+    
+    // Convert click coordinates to image coordinates (before zoom scaling)
+    const imageX = (clickX - offsetX) / scale;
+    const imageY = (clickY - offsetY) / scale;
+    
+    // Check if click is within the image bounds
+    if (imageX < 0 || imageX > naturalWidth || imageY < 0 || imageY > naturalHeight) {
+      return; // Click is outside the image
+    }
 
     if (isWaypointMode && newPointName.trim()) {
       const waypoint: Waypoint = {
         id: `wp-${Date.now()}`,
         name: newPointName.trim(),
-        x,
-        y,
+        x: imageX,
+        y: imageY,
         type: 'corridor'
       };
       setWaypoints(prev => [...prev, waypoint]);
@@ -68,8 +86,8 @@ export const ImageMap = () => {
       const room: Room = {
         id: `room-${Date.now()}`,
         name: roomNumber.toString(),
-        x,
-        y
+        x: imageX,
+        y: imageY
       };
       setRooms(prev => [...prev, room]);
       toast({ title: `Room ${roomNumber} placed` });
@@ -417,34 +435,94 @@ export const ImageMap = () => {
             />
             
             {/* Waypoints */}
-            {waypoints.map(wp => (
-              <div
-                key={wp.id}
-                className="absolute w-3 h-3 bg-orange-500 border-2 border-white rounded-full shadow-lg"
-                style={{ left: wp.x * zoom - 6, top: wp.y * zoom - 6 }}
-                title={wp.name}
-              />
-            ))}
+            {waypoints.map(wp => {
+              const rect = imageRef.current?.getBoundingClientRect();
+              if (!rect) return null;
+              
+              const naturalWidth = imageRef.current?.naturalWidth || 1;
+              const naturalHeight = imageRef.current?.naturalHeight || 1;
+              const containerWidth = rect.width;
+              const containerHeight = rect.height;
+              
+              const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
+              const displayedWidth = naturalWidth * scale;
+              const displayedHeight = naturalHeight * scale;
+              
+              const offsetX = (containerWidth - displayedWidth) / 2;
+              const offsetY = (containerHeight - displayedHeight) / 2;
+              
+              const x = offsetX + (wp.x * scale) - 6;
+              const y = offsetY + (wp.y * scale) - 6;
+              
+              return (
+                <div
+                  key={wp.id}
+                  className="absolute w-3 h-3 bg-orange-500 border-2 border-white rounded-full shadow-lg pointer-events-none"
+                  style={{ left: x, top: y }}
+                  title={wp.name}
+                />
+              );
+            })}
             
             {/* Rooms */}
-            {rooms.map(room => (
-              <div
-                key={room.id}
-                className={`absolute w-4 h-4 border-2 border-white rounded-full shadow-lg cursor-pointer ${
-                  selectedStart?.id === room.id ? 'bg-green-500' :
-                  selectedEnd?.id === room.id ? 'bg-red-500' : 'bg-blue-500'
-                }`}
-                style={{ left: room.x * zoom - 8, top: room.y * zoom - 8 }}
-                onClick={() => selectRoom(room)}
-                title={room.name}
-              />
-            ))}
+            {rooms.map(room => {
+              const rect = imageRef.current?.getBoundingClientRect();
+              if (!rect) return null;
+              
+              const naturalWidth = imageRef.current?.naturalWidth || 1;
+              const naturalHeight = imageRef.current?.naturalHeight || 1;
+              const containerWidth = rect.width;
+              const containerHeight = rect.height;
+              
+              const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
+              const displayedWidth = naturalWidth * scale;
+              const displayedHeight = naturalHeight * scale;
+              
+              const offsetX = (containerWidth - displayedWidth) / 2;
+              const offsetY = (containerHeight - displayedHeight) / 2;
+              
+              const x = offsetX + (room.x * scale) - 8;
+              const y = offsetY + (room.y * scale) - 8;
+              
+              return (
+                <div
+                  key={room.id}
+                  className={`absolute w-4 h-4 border-2 border-white rounded-full shadow-lg cursor-pointer ${
+                    selectedStart?.id === room.id ? 'bg-green-500' :
+                    selectedEnd?.id === room.id ? 'bg-red-500' : 'bg-blue-500'
+                  }`}
+                  style={{ left: x, top: y }}
+                  onClick={() => selectRoom(room)}
+                  title={room.name}
+                />
+              );
+            })}
             
             {/* Route Line */}
             {route.length > 1 && (
               <svg className="absolute inset-0 pointer-events-none">
                 <polyline
-                  points={route.map(wp => `${wp.x * zoom},${wp.y * zoom}`).join(' ')}
+                  points={route.map(wp => {
+                    const rect = imageRef.current?.getBoundingClientRect();
+                    if (!rect) return '0,0';
+                    
+                    const naturalWidth = imageRef.current?.naturalWidth || 1;
+                    const naturalHeight = imageRef.current?.naturalHeight || 1;
+                    const containerWidth = rect.width;
+                    const containerHeight = rect.height;
+                    
+                    const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
+                    const displayedWidth = naturalWidth * scale;
+                    const displayedHeight = naturalHeight * scale;
+                    
+                    const offsetX = (containerWidth - displayedWidth) / 2;
+                    const offsetY = (containerHeight - displayedHeight) / 2;
+                    
+                    const x = offsetX + (wp.x * scale);
+                    const y = offsetY + (wp.y * scale);
+                    
+                    return `${x},${y}`;
+                  }).join(' ')}
                   fill="none"
                   stroke="hsl(214, 84%, 56%)"
                   strokeWidth="3"

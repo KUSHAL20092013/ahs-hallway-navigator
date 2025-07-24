@@ -10,16 +10,16 @@ import { toast } from '@/hooks/use-toast';
 interface Waypoint {
   id: string;
   name: string;
-  x: number; // Pixel coordinates on the image
-  y: number;
+  x: number; // Percentage of natural image width (0-1)
+  y: number; // Percentage of natural image height (0-1)
   type: 'corridor' | 'junction' | 'entrance' | 'room';
 }
 
 interface Room {
   id: string;
   name: string;
-  x: number;
-  y: number;
+  x: number; // Percentage of natural image width (0-1)
+  y: number; // Percentage of natural image height (0-1)
 }
 
 export const ImageMap = () => {
@@ -41,18 +41,18 @@ export const ImageMap = () => {
     if (!imageRef.current) return;
     
     const rect = imageRef.current.getBoundingClientRect();
+    const naturalWidth = imageRef.current.naturalWidth;
+    const naturalHeight = imageRef.current.naturalHeight;
+    
+    if (naturalWidth === 0 || naturalHeight === 0) return;
     
     // Get click position relative to the container
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
     
-    // Calculate the actual image dimensions as displayed (before scaling)
-    const naturalWidth = imageRef.current.naturalWidth;
-    const naturalHeight = imageRef.current.naturalHeight;
+    // Calculate how the image is displayed (object-contain behavior)
     const containerWidth = rect.width;
     const containerHeight = rect.height;
-    
-    // Calculate how the image is actually displayed (object-contain behavior)
     const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
     const displayedWidth = naturalWidth * scale;
     const displayedHeight = naturalHeight * scale;
@@ -61,21 +61,25 @@ export const ImageMap = () => {
     const offsetX = (containerWidth - displayedWidth) / 2;
     const offsetY = (containerHeight - displayedHeight) / 2;
     
-    // Convert click coordinates to image coordinates (before zoom scaling)
-    const imageX = (clickX - offsetX) / scale;
-    const imageY = (clickY - offsetY) / scale;
+    // Convert click coordinates to image coordinates (accounting for zoom)
+    const imageX = ((clickX - offsetX) / zoom - offsetX * (1 - zoom) / zoom) / scale;
+    const imageY = ((clickY - offsetY) / zoom - offsetY * (1 - zoom) / zoom) / scale;
     
     // Check if click is within the image bounds
     if (imageX < 0 || imageX > naturalWidth || imageY < 0 || imageY > naturalHeight) {
-      return; // Click is outside the image
+      return;
     }
+
+    // Convert to percentage coordinates
+    const percentX = imageX / naturalWidth;
+    const percentY = imageY / naturalHeight;
 
     if (isWaypointMode && newPointName.trim()) {
       const waypoint: Waypoint = {
         id: `wp-${Date.now()}`,
         name: newPointName.trim(),
-        x: imageX,
-        y: imageY,
+        x: percentX,
+        y: percentY,
         type: 'corridor'
       };
       setWaypoints(prev => [...prev, waypoint]);
@@ -86,8 +90,8 @@ export const ImageMap = () => {
       const room: Room = {
         id: `room-${Date.now()}`,
         name: roomNumber.toString(),
-        x: imageX,
-        y: imageY
+        x: percentX,
+        y: percentY
       };
       setRooms(prev => [...prev, room]);
       toast({ title: `Room ${roomNumber} placed` });
@@ -110,7 +114,7 @@ export const ImageMap = () => {
       return;
     }
 
-    // Simple pathfinding through waypoints (you can enhance this)
+    // Simple pathfinding through waypoints
     const startWaypoint = findNearestWaypoint(selectedStart.x, selectedStart.y);
     const endWaypoint = findNearestWaypoint(selectedEnd.x, selectedEnd.y);
     
@@ -119,7 +123,6 @@ export const ImageMap = () => {
       return;
     }
 
-    // For now, simple route through nearest waypoints
     const routePath = [startWaypoint, endWaypoint];
     setRoute(routePath);
     toast({ title: `Route calculated via ${routePath.length} waypoints` });
@@ -148,7 +151,6 @@ export const ImageMap = () => {
     setRoute([]);
     toast({ title: "Route cleared" });
   };
-
 
   const deleteWaypoint = (id: string) => {
     setWaypoints(prev => prev.filter(wp => wp.id !== id));
@@ -189,7 +191,8 @@ export const ImageMap = () => {
     const data = {
       rooms,
       waypoints,
-      exportDate: new Date().toISOString()
+      exportDate: new Date().toISOString(),
+      coordinateSystem: 'percentage' // Flag to indicate coordinate system
     };
     
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -205,6 +208,40 @@ export const ImageMap = () => {
     toast({ title: "Floor plan exported successfully" });
   };
 
+  // Migration helper for old absolute coordinates
+  const migrateCoordinates = (data: any) => {
+    if (!imageRef.current) return data;
+    
+    const naturalWidth = imageRef.current.naturalWidth;
+    const naturalHeight = imageRef.current.naturalHeight;
+    
+    if (naturalWidth === 0 || naturalHeight === 0) return data;
+    
+    // Check if migration is needed (old format doesn't have coordinateSystem flag)
+    const needsMigration = !data.coordinateSystem;
+    
+    if (needsMigration) {
+      // Convert absolute coordinates to percentages
+      if (data.rooms) {
+        data.rooms = data.rooms.map((room: any) => ({
+          ...room,
+          x: Math.min(Math.max(room.x / naturalWidth, 0), 1),
+          y: Math.min(Math.max(room.y / naturalHeight, 0), 1)
+        }));
+      }
+      
+      if (data.waypoints) {
+        data.waypoints = data.waypoints.map((waypoint: any) => ({
+          ...waypoint,
+          x: Math.min(Math.max(waypoint.x / naturalWidth, 0), 1),
+          y: Math.min(Math.max(waypoint.y / naturalHeight, 0), 1)
+        }));
+      }
+    }
+    
+    return data;
+  };
+
   const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -212,7 +249,10 @@ export const ImageMap = () => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = JSON.parse(e.target?.result as string);
+        let data = JSON.parse(e.target?.result as string);
+        
+        // Migrate old coordinate system if needed
+        data = migrateCoordinates(data);
         
         if (data.rooms && Array.isArray(data.rooms)) {
           setRooms(data.rooms);
@@ -244,6 +284,31 @@ export const ImageMap = () => {
   const filteredRooms = rooms.filter(room => 
     room.name.toLowerCase().includes(roomSearchTerm.toLowerCase())
   );
+
+  // Helper function to convert percentage coordinates to display coordinates
+  const getDisplayCoordinates = (percentX: number, percentY: number) => {
+    if (!imageRef.current) return { x: 0, y: 0 };
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const naturalWidth = imageRef.current.naturalWidth;
+    const naturalHeight = imageRef.current.naturalHeight;
+    
+    if (naturalWidth === 0 || naturalHeight === 0) return { x: 0, y: 0 };
+    
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
+    const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
+    const displayedWidth = naturalWidth * scale;
+    const displayedHeight = naturalHeight * scale;
+    
+    const offsetX = (containerWidth - displayedWidth) / 2;
+    const offsetY = (containerHeight - displayedHeight) / 2;
+    
+    const x = offsetX + (percentX * naturalWidth * scale);
+    const y = offsetY + (percentY * naturalHeight * scale);
+    
+    return { x, y };
+  };
 
   return (
     <div className="w-full h-screen flex bg-background">
@@ -436,29 +501,13 @@ export const ImageMap = () => {
             
             {/* Waypoints */}
             {waypoints.map(wp => {
-              const rect = imageRef.current?.getBoundingClientRect();
-              if (!rect) return null;
-              
-              const naturalWidth = imageRef.current?.naturalWidth || 1;
-              const naturalHeight = imageRef.current?.naturalHeight || 1;
-              const containerWidth = rect.width;
-              const containerHeight = rect.height;
-              
-              const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
-              const displayedWidth = naturalWidth * scale;
-              const displayedHeight = naturalHeight * scale;
-              
-              const offsetX = (containerWidth - displayedWidth) / 2;
-              const offsetY = (containerHeight - displayedHeight) / 2;
-              
-              const x = offsetX + (wp.x * scale) - 6;
-              const y = offsetY + (wp.y * scale) - 6;
+              const { x, y } = getDisplayCoordinates(wp.x, wp.y);
               
               return (
                 <div
                   key={wp.id}
                   className="absolute w-3 h-3 bg-orange-500 border-2 border-white rounded-full shadow-lg pointer-events-none"
-                  style={{ left: x, top: y }}
+                  style={{ left: x - 6, top: y - 6 }}
                   title={wp.name}
                 />
               );
@@ -466,23 +515,7 @@ export const ImageMap = () => {
             
             {/* Rooms */}
             {rooms.map(room => {
-              const rect = imageRef.current?.getBoundingClientRect();
-              if (!rect) return null;
-              
-              const naturalWidth = imageRef.current?.naturalWidth || 1;
-              const naturalHeight = imageRef.current?.naturalHeight || 1;
-              const containerWidth = rect.width;
-              const containerHeight = rect.height;
-              
-              const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
-              const displayedWidth = naturalWidth * scale;
-              const displayedHeight = naturalHeight * scale;
-              
-              const offsetX = (containerWidth - displayedWidth) / 2;
-              const offsetY = (containerHeight - displayedHeight) / 2;
-              
-              const x = offsetX + (room.x * scale) - 8;
-              const y = offsetY + (room.y * scale) - 8;
+              const { x, y } = getDisplayCoordinates(room.x, room.y);
               
               return (
                 <div
@@ -491,7 +524,7 @@ export const ImageMap = () => {
                     selectedStart?.id === room.id ? 'bg-green-500' :
                     selectedEnd?.id === room.id ? 'bg-red-500' : 'bg-blue-500'
                   }`}
-                  style={{ left: x, top: y }}
+                  style={{ left: x - 8, top: y - 8 }}
                   onClick={() => selectRoom(room)}
                   title={room.name}
                 />
@@ -503,24 +536,7 @@ export const ImageMap = () => {
               <svg className="absolute inset-0 pointer-events-none">
                 <polyline
                   points={route.map(wp => {
-                    const rect = imageRef.current?.getBoundingClientRect();
-                    if (!rect) return '0,0';
-                    
-                    const naturalWidth = imageRef.current?.naturalWidth || 1;
-                    const naturalHeight = imageRef.current?.naturalHeight || 1;
-                    const containerWidth = rect.width;
-                    const containerHeight = rect.height;
-                    
-                    const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
-                    const displayedWidth = naturalWidth * scale;
-                    const displayedHeight = naturalHeight * scale;
-                    
-                    const offsetX = (containerWidth - displayedWidth) / 2;
-                    const offsetY = (containerHeight - displayedHeight) / 2;
-                    
-                    const x = offsetX + (wp.x * scale);
-                    const y = offsetY + (wp.y * scale);
-                    
+                    const { x, y } = getDisplayCoordinates(wp.x, wp.y);
                     return `${x},${y}`;
                   }).join(' ')}
                   fill="none"

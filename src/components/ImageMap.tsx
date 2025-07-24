@@ -115,18 +115,30 @@ export const ImageMap = () => {
       return;
     }
 
-    // Simple pathfinding through waypoints
+    if (waypoints.length < 2) {
+      toast({ title: "Need at least 2 waypoints for routing", variant: "destructive" });
+      return;
+    }
+
+    // Find nearest waypoints to start and end rooms
     const startWaypoint = findNearestWaypoint(selectedStart.x, selectedStart.y);
     const endWaypoint = findNearestWaypoint(selectedEnd.x, selectedEnd.y);
     
     if (!startWaypoint || !endWaypoint) {
-      toast({ title: "Need more waypoints for routing", variant: "destructive" });
+      toast({ title: "Could not find nearby waypoints", variant: "destructive" });
       return;
     }
 
-    const routePath = [startWaypoint, endWaypoint];
-    setRoute(routePath);
-    toast({ title: `Route calculated via ${routePath.length} waypoints` });
+    // Find optimal path using A* algorithm
+    const path = findOptimalPath(startWaypoint, endWaypoint);
+    
+    if (path.length === 0) {
+      toast({ title: "No path found between waypoints", variant: "destructive" });
+      return;
+    }
+
+    setRoute(path);
+    toast({ title: `Route found with ${path.length} waypoints` });
   };
 
   const findNearestWaypoint = (x: number, y: number): Waypoint | null => {
@@ -144,6 +156,88 @@ export const ImageMap = () => {
     }
     
     return nearest;
+  };
+
+  const findOptimalPath = (start: Waypoint, end: Waypoint): Waypoint[] => {
+    if (start.id === end.id) return [start];
+    
+    // Build adjacency graph - connect waypoints within reasonable distance
+    const maxConnectionDistance = 0.15; // 15% of image width/height
+    const graph = new Map<string, Waypoint[]>();
+    
+    // Initialize graph
+    waypoints.forEach(wp => {
+      graph.set(wp.id, []);
+    });
+    
+    // Create connections between nearby waypoints
+    waypoints.forEach(wp1 => {
+      waypoints.forEach(wp2 => {
+        if (wp1.id !== wp2.id) {
+          const distance = Math.hypot(wp1.x - wp2.x, wp1.y - wp2.y);
+          if (distance <= maxConnectionDistance) {
+            graph.get(wp1.id)!.push(wp2);
+          }
+        }
+      });
+    });
+    
+    // A* pathfinding algorithm
+    const openSet = new Set([start.id]);
+    const cameFrom = new Map<string, string>();
+    const gScore = new Map<string, number>();
+    const fScore = new Map<string, number>();
+    
+    // Initialize scores
+    waypoints.forEach(wp => {
+      gScore.set(wp.id, Infinity);
+      fScore.set(wp.id, Infinity);
+    });
+    
+    gScore.set(start.id, 0);
+    fScore.set(start.id, Math.hypot(start.x - end.x, start.y - end.y));
+    
+    while (openSet.size > 0) {
+      // Find node with lowest fScore
+      let current = '';
+      let lowestF = Infinity;
+      for (const id of openSet) {
+        const f = fScore.get(id) || Infinity;
+        if (f < lowestF) {
+          lowestF = f;
+          current = id;
+        }
+      }
+      
+      if (current === end.id) {
+        // Reconstruct path
+        const path = [end];
+        let currentId = end.id;
+        while (cameFrom.has(currentId)) {
+          currentId = cameFrom.get(currentId)!;
+          const waypoint = waypoints.find(wp => wp.id === currentId);
+          if (waypoint) path.unshift(waypoint);
+        }
+        return path;
+      }
+      
+      openSet.delete(current);
+      const neighbors = graph.get(current) || [];
+      
+      for (const neighbor of neighbors) {
+        const currentWp = waypoints.find(wp => wp.id === current)!;
+        const tentativeG = (gScore.get(current) || 0) + Math.hypot(currentWp.x - neighbor.x, currentWp.y - neighbor.y);
+        
+        if (tentativeG < (gScore.get(neighbor.id) || Infinity)) {
+          cameFrom.set(neighbor.id, current);
+          gScore.set(neighbor.id, tentativeG);
+          fScore.set(neighbor.id, tentativeG + Math.hypot(neighbor.x - end.x, neighbor.y - end.y));
+          openSet.add(neighbor.id);
+        }
+      }
+    }
+    
+    return []; // No path found
   };
 
   const clearRoute = () => {

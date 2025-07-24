@@ -515,7 +515,7 @@ export const ImageMap = () => {
               return (
                 <div
                   key={room.id}
-                  className={`absolute w-4 h-4 border-2 border-white rounded-full shadow-lg ${
+                  className={`absolute w-4 h-4 border-2 border-white rounded-full shadow-lg pointer-events-none ${
                     selectedStart?.id === room.id ? 'bg-green-500' :
                     selectedEnd?.id === room.id ? 'bg-red-500' : 'bg-blue-500'
                   }`}

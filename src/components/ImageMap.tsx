@@ -515,12 +515,11 @@ export const ImageMap = () => {
               return (
                 <div
                   key={room.id}
-                  className={`absolute w-4 h-4 border-2 border-white rounded-full shadow-lg cursor-pointer ${
+                  className={`absolute w-4 h-4 border-2 border-white rounded-full shadow-lg ${
                     selectedStart?.id === room.id ? 'bg-green-500' :
                     selectedEnd?.id === room.id ? 'bg-red-500' : 'bg-blue-500'
                   }`}
                   style={{ left: x - 8, top: y - 8 }}
-                  onClick={() => selectRoom(room)}
                   title={room.name}
                 />
               );

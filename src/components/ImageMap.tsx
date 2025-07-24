@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut } from 'lucide-react';
+import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface Waypoint {
@@ -34,6 +34,7 @@ export const ImageMap = () => {
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editingRoomName, setEditingRoomName] = useState('');
   const [roomSearchTerm, setRoomSearchTerm] = useState('');
+  const [showRooms, setShowRooms] = useState(true);
   const [zoom, setZoom] = useState(1);
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -411,6 +412,14 @@ export const ImageMap = () => {
         <div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold">Rooms ({rooms.length})</h3>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowRooms(!showRooms)}
+              className="h-7 w-7 p-0"
+            >
+              {showRooms ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            </Button>
           </div>
           
           {/* Room Search */}
@@ -509,17 +518,18 @@ export const ImageMap = () => {
             })}
             
             {/* Rooms */}
-            {rooms.map(room => {
+            {showRooms && rooms.map(room => {
               const { x, y } = getDisplayCoordinates(room.x, room.y);
               
               return (
                 <div
                   key={room.id}
-                  className={`absolute w-4 h-4 border-2 border-white rounded-full shadow-lg pointer-events-none ${
+                  className={`absolute w-4 h-4 border-2 border-white rounded-full shadow-lg cursor-pointer ${
                     selectedStart?.id === room.id ? 'bg-green-500' :
                     selectedEnd?.id === room.id ? 'bg-red-500' : 'bg-blue-500'
                   }`}
                   style={{ left: x - 8, top: y - 8 }}
+                  onClick={() => selectRoom(room)}
                   title={room.name}
                 />
               );

@@ -488,15 +488,20 @@ export const ImageMap = () => {
       {/* Floor Plan */}
       <div className="flex-1 relative overflow-hidden">
         <div className="relative w-full h-full flex items-center justify-center">
-          <div className="relative max-w-full max-h-full">
+        <div className="relative w-full h-full flex items-center justify-center overflow-auto">
             <img 
               ref={imageRef}
               src="/school-floorplan.jpg" 
               alt="School Floor Plan"
-              className="max-w-full max-h-full object-contain cursor-crosshair transition-transform duration-200"
+              className="w-full h-full object-contain cursor-crosshair transition-transform duration-200"
               onClick={handleImageClick}
               draggable={false}
-              style={{ transform: `scale(${zoom})` }}
+              style={{ 
+                transform: `scale(${zoom})`,
+                transformOrigin: 'center center',
+                minWidth: '100%',
+                minHeight: '100%'
+              }}
             />
             
             {/* Waypoints */}

@@ -74,17 +74,17 @@ export const ImageMap = () => {
     const percentX = imageX / naturalWidth;
     const percentY = imageY / naturalHeight;
 
-    if (isWaypointMode && newPointName.trim()) {
+    if (isWaypointMode) {
+      const waypointNumber = waypoints.length + 1;
       const waypoint: Waypoint = {
         id: `wp-${Date.now()}`,
-        name: newPointName.trim(),
+        name: `WP${waypointNumber}`,
         x: percentX,
         y: percentY,
         type: 'corridor'
       };
       setWaypoints(prev => [...prev, waypoint]);
-      setNewPointName('');
-      toast({ title: `Waypoint "${waypoint.name}" placed` });
+      toast({ title: `Waypoint ${waypointNumber} placed` });
     } else if (isRoomMode) {
       const roomNumber = rooms.length + 1;
       const room: Room = {
@@ -343,16 +343,6 @@ export const ImageMap = () => {
             </Button>
           </div>
           
-          {isWaypointMode && (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Waypoint name"
-                value={newPointName}
-                onChange={(e) => setNewPointName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && setNewPointName('')}
-              />
-            </div>
-          )}
         </div>
 
         {/* Save/Load Controls */}
@@ -582,7 +572,7 @@ export const ImageMap = () => {
         {/* Instructions */}
         <div className="absolute top-4 left-4 bg-background/95 p-3 rounded border">
           <p className="text-sm text-muted-foreground">
-            {isWaypointMode ? 'Enter waypoint name, then click to place corridor points' :
+            {isWaypointMode ? 'Click to place waypoints (auto-numbered WP1, WP2, WP3...)' :
              isRoomMode ? 'Click to place rooms (auto-numbered 1, 2, 3...)' :
              'Select mode to start placing points'}
           </p>

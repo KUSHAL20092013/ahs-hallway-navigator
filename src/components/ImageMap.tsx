@@ -38,7 +38,7 @@ export const ImageMap = () => {
   const [showRooms, setShowRooms] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [showCorridors, setShowCorridors] = useState(false);
-  const [useStrategicWaypoints, setUseStrategicWaypoints] = useState(true);
+  const [useStrategicWaypoints, setUseStrategicWaypoints] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
@@ -118,9 +118,7 @@ export const ImageMap = () => {
       return;
     }
 
-    const currentWaypoints = useStrategicWaypoints ? 
-      strategicWaypoints.map(sw => ({ id: sw.id, name: sw.name, x: sw.x, y: sw.y, type: sw.type as any })) : 
-      waypoints;
+    const currentWaypoints = waypoints;
 
     if (currentWaypoints.length < 2) {
       toast({ title: "Need at least 2 waypoints for routing", variant: "destructive" });
@@ -197,9 +195,7 @@ export const ImageMap = () => {
   const findOptimalPath = (start: Waypoint, end: Waypoint): Waypoint[] => {
     if (start.id === end.id) return [start];
     
-    const currentWaypoints = useStrategicWaypoints ? 
-      strategicWaypoints.map(sw => ({ id: sw.id, name: sw.name, x: sw.x, y: sw.y, type: sw.type as any })) : 
-      waypoints;
+    const currentWaypoints = waypoints;
     
     const graph = new Map<string, Waypoint[]>();
     
@@ -208,28 +204,18 @@ export const ImageMap = () => {
       graph.set(wp.id, []);
     });
     
-    if (useStrategicWaypoints) {
-      // Use predefined connections for strategic waypoints
-      strategicWaypoints.forEach(wp => {
-        const connections = wp.connections
-          .map(connId => currentWaypoints.find(w => w.id === connId))
-          .filter(Boolean) as Waypoint[];
-        graph.set(wp.id, connections);
-      });
-    } else {
-      // Create connections between nearby waypoints with line-of-sight check
-      const maxConnectionDistance = 0.20;
-      currentWaypoints.forEach(wp1 => {
-        currentWaypoints.forEach(wp2 => {
-          if (wp1.id !== wp2.id) {
-            const distance = Math.hypot(wp1.x - wp2.x, wp1.y - wp2.y);
-            if (distance <= maxConnectionDistance && hasLineOfSight(wp1, wp2)) {
-              graph.get(wp1.id)!.push(wp2);
-            }
+    // Create connections between nearby waypoints with line-of-sight check
+    const maxConnectionDistance = 0.20;
+    currentWaypoints.forEach(wp1 => {
+      currentWaypoints.forEach(wp2 => {
+        if (wp1.id !== wp2.id) {
+          const distance = Math.hypot(wp1.x - wp2.x, wp1.y - wp2.y);
+          if (distance <= maxConnectionDistance && hasLineOfSight(wp1, wp2)) {
+            graph.get(wp1.id)!.push(wp2);
           }
-        });
+        }
       });
-    }
+    });
     
     // A* pathfinding algorithm with safety limits
     const openSet = new Set([start.id]);
@@ -475,13 +461,12 @@ export const ImageMap = () => {
         <div className="space-y-3 mb-6">
           <div className="flex gap-2 flex-wrap">
             <Button
-              variant={useStrategicWaypoints ? "outline" : (isWaypointMode ? "default" : "outline")}
+              variant={isWaypointMode ? "default" : "outline"}
               size="sm"
               onClick={() => {
                 setIsWaypointMode(!isWaypointMode);
                 setIsRoomMode(false);
               }}
-              disabled={useStrategicWaypoints}
             >
               <MapPin className="w-4 h-4 mr-1" />
               Waypoints
@@ -496,14 +481,6 @@ export const ImageMap = () => {
             >
               <Plus className="w-4 h-4 mr-1" />
               Rooms
-            </Button>
-            <Button
-              variant={useStrategicWaypoints ? "default" : "outline"}
-              size="sm"
-              onClick={() => setUseStrategicWaypoints(!useStrategicWaypoints)}
-            >
-              <Navigation className="w-4 h-4 mr-1" />
-              {useStrategicWaypoints ? 'Strategic' : 'Manual'}
             </Button>
             <Button
               variant={showCorridors ? "default" : "outline"}
@@ -564,20 +541,15 @@ export const ImageMap = () => {
         {/* Waypoints List */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold">
-              Waypoints ({useStrategicWaypoints ? strategicWaypoints.length : waypoints.length})
-              {useStrategicWaypoints && <Badge variant="secondary" className="ml-2">Strategic</Badge>}
-            </h3>
+            <h3 className="font-semibold">Waypoints ({waypoints.length})</h3>
           </div>
           <div className="space-y-1 max-h-32 overflow-y-auto">
-            {(useStrategicWaypoints ? strategicWaypoints : waypoints).map(wp => (
+            {waypoints.map(wp => (
               <div key={wp.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
                 <span>{wp.name}</span>
-                {!useStrategicWaypoints && (
-                  <Button size="sm" variant="ghost" onClick={() => deleteWaypoint(wp.id)}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                )}
+                <Button size="sm" variant="ghost" onClick={() => deleteWaypoint(wp.id)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
               </div>
             ))}
           </div>
@@ -701,15 +673,13 @@ export const ImageMap = () => {
             })}
             
             {/* Waypoints */}
-            {(useStrategicWaypoints ? strategicWaypoints : waypoints).map(wp => {
+            {waypoints.map(wp => {
               const { x, y } = getDisplayCoordinates(wp.x, wp.y);
               
               return (
                 <div
                   key={wp.id}
-                  className={`absolute w-3 h-3 border-2 border-white rounded-full shadow-lg pointer-events-none ${
-                    useStrategicWaypoints ? 'bg-orange-500' : 'bg-blue-500'
-                  }`}
+                  className="absolute w-3 h-3 bg-blue-500 border-2 border-white rounded-full shadow-lg pointer-events-none"
                   style={{ left: x - 6, top: y - 6 }}
                   title={wp.name}
                 />

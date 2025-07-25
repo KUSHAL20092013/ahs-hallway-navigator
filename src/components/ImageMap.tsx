@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut, Eye, EyeOff, Link } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface Waypoint {
   id: string;
@@ -25,7 +25,8 @@ interface Room {
 interface Path {
   id: string;
   waypointA: string; // waypoint ID
-  waypointB: string; // waypoint ID
+  waypointB?: string; // waypoint ID (optional for waypoint-to-room paths)
+  roomB?: string; // room ID (optional for waypoint-to-room paths)
 }
 
 export const ImageMap = () => {
@@ -36,6 +37,8 @@ export const ImageMap = () => {
   const [isRoomMode, setIsRoomMode] = useState(false);
   const [isPathMode, setIsPathMode] = useState(false);
   const [selectedWaypointForPath, setSelectedWaypointForPath] = useState<string | null>(null);
+  const [selectedRoomForPath, setSelectedRoomForPath] = useState<string | null>(null);
+  const { toast } = useToast();
   const [newPointName, setNewPointName] = useState('');
   const [selectedStart, setSelectedStart] = useState<Room | null>(null);
   const [selectedEnd, setSelectedEnd] = useState<Room | null>(null);
@@ -112,11 +115,11 @@ export const ImageMap = () => {
   const handleWaypointClick = (waypointId: string) => {
     if (!isPathMode) return;
     
-    if (!selectedWaypointForPath) {
+    if (!selectedWaypointForPath && !selectedRoomForPath) {
       setSelectedWaypointForPath(waypointId);
-      toast({ title: "Now click second waypoint to create path" });
-    } else if (selectedWaypointForPath !== waypointId) {
-      // Check if path already exists
+      toast({ title: "Now click another waypoint or room to create path" });
+    } else if (selectedWaypointForPath && selectedWaypointForPath !== waypointId) {
+      // Waypoint to waypoint path
       const pathExists = paths.some(p => 
         (p.waypointA === selectedWaypointForPath && p.waypointB === waypointId) ||
         (p.waypointA === waypointId && p.waypointB === selectedWaypointForPath)
@@ -131,11 +134,68 @@ export const ImageMap = () => {
           waypointB: waypointId
         };
         setPaths(prev => [...prev, newPath]);
-        toast({ title: "Path created" });
+        toast({ title: "Waypoint-to-waypoint path created" });
+      }
+      setSelectedWaypointForPath(null);
+    } else if (selectedRoomForPath) {
+      // Room to waypoint path
+      const pathExists = paths.some(p => 
+        (p.waypointA === waypointId && p.roomB === selectedRoomForPath)
+      );
+      
+      if (pathExists) {
+        toast({ title: "Path already exists between this waypoint and room", variant: "destructive" });
+      } else {
+        const newPath: Path = {
+          id: `path-${Date.now()}`,
+          waypointA: waypointId,
+          roomB: selectedRoomForPath
+        };
+        setPaths(prev => [...prev, newPath]);
+        toast({ title: "Waypoint-to-room path created" });
+      }
+      setSelectedRoomForPath(null);
+    } else {
+      // Cancel selection
+      setSelectedWaypointForPath(null);
+      setSelectedRoomForPath(null);
+      toast({ title: "Path creation cancelled" });
+    }
+  };
+
+  const handleRoomClick = (roomId: string) => {
+    if (!isPathMode) {
+      // Normal room selection for routing
+      const room = rooms.find(r => r.id === roomId);
+      if (room) selectRoom(room);
+      return;
+    }
+    
+    if (!selectedWaypointForPath && !selectedRoomForPath) {
+      setSelectedRoomForPath(roomId);
+      toast({ title: "Now click a waypoint to create path" });
+    } else if (selectedWaypointForPath) {
+      // Waypoint to room path
+      const pathExists = paths.some(p => 
+        (p.waypointA === selectedWaypointForPath && p.roomB === roomId)
+      );
+      
+      if (pathExists) {
+        toast({ title: "Path already exists between this waypoint and room", variant: "destructive" });
+      } else {
+        const newPath: Path = {
+          id: `path-${Date.now()}`,
+          waypointA: selectedWaypointForPath,
+          roomB: roomId
+        };
+        setPaths(prev => [...prev, newPath]);
+        toast({ title: "Waypoint-to-room path created" });
       }
       setSelectedWaypointForPath(null);
     } else {
+      // Cancel selection
       setSelectedWaypointForPath(null);
+      setSelectedRoomForPath(null);
       toast({ title: "Path creation cancelled" });
     }
   };
@@ -169,8 +229,26 @@ export const ImageMap = () => {
       return distance < nearestDistance ? wp : nearest;
     });
 
+    // Check if there's a direct waypoint-to-room path for start or end
+    let actualStartWaypoint = startWaypoint;
+    let actualEndWaypoint = endWaypoint;
+    
+    // If start room has a direct path to a waypoint, use that waypoint
+    const startRoomPath = paths.find(p => p.roomB === selectedStart.id);
+    if (startRoomPath) {
+      const connectedWaypoint = waypoints.find(wp => wp.id === startRoomPath.waypointA);
+      if (connectedWaypoint) actualStartWaypoint = connectedWaypoint;
+    }
+    
+    // If end room has a direct path to a waypoint, use that waypoint
+    const endRoomPath = paths.find(p => p.roomB === selectedEnd.id);
+    if (endRoomPath) {
+      const connectedWaypoint = waypoints.find(wp => wp.id === endRoomPath.waypointA);
+      if (connectedWaypoint) actualEndWaypoint = connectedWaypoint;
+    }
+
     // Find optimal path using A* algorithm
-    const path = findOptimalPath(startWaypoint, endWaypoint);
+    const path = findOptimalPath(actualStartWaypoint, actualEndWaypoint);
     
     if (path.length === 0) {
       toast({ title: "No path found between waypoints", variant: "destructive" });
@@ -236,11 +314,17 @@ export const ImageMap = () => {
     // Add connections based on manually created paths
     paths.forEach(path => {
       const waypointA = waypoints.find(wp => wp.id === path.waypointA);
-      const waypointB = waypoints.find(wp => wp.id === path.waypointB);
       
-      if (waypointA && waypointB) {
-        graph.get(path.waypointA)!.push(waypointB);
-        graph.get(path.waypointB)!.push(waypointA); // bidirectional
+      if (path.waypointB) {
+        // Waypoint to waypoint path
+        const waypointB = waypoints.find(wp => wp.id === path.waypointB);
+        if (waypointA && waypointB) {
+          graph.get(path.waypointA)!.push(waypointB);
+          graph.get(path.waypointB)!.push(waypointA); // bidirectional
+        }
+      } else if (path.roomB) {
+        // Waypoint to room path - we'll handle this when finding routes to rooms
+        // For now, just ensure the waypoint exists in the graph
       }
     });
     
@@ -539,10 +623,16 @@ export const ImageMap = () => {
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {paths.map(path => {
               const wpA = waypoints.find(w => w.id === path.waypointA);
-              const wpB = waypoints.find(w => w.id === path.waypointB);
+              const wpB = path.waypointB ? waypoints.find(w => w.id === path.waypointB) : null;
+              const roomB = path.roomB ? rooms.find(r => r.id === path.roomB) : null;
+              
+              const pathLabel = wpB 
+                ? `${wpA?.name} ↔ ${wpB?.name}` 
+                : `${wpA?.name} ↔ ${roomB?.name}`;
+              
               return (
                 <div key={path.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
-                  <span>{wpA?.name} ↔ {wpB?.name}</span>
+                  <span>{pathLabel}</span>
                   <Button size="sm" variant="ghost" onClick={() => deletePath(path.id)}>
                     <Trash2 className="w-3 h-3" />
                   </Button>
@@ -550,7 +640,7 @@ export const ImageMap = () => {
               );
             })}
             {paths.length === 0 && (
-              <p className="text-xs text-muted-foreground">No paths created. Use Path mode to connect waypoints.</p>
+              <p className="text-xs text-muted-foreground">No paths created. Use Path mode to connect waypoints and rooms.</p>
             )}
           </div>
         </div>
@@ -559,7 +649,7 @@ export const ImageMap = () => {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold">Waypoints ({waypoints.length})</h3>
-            {isPathMode && <p className="text-xs text-muted-foreground mt-1">Click waypoints to create paths</p>}
+            {isPathMode && <p className="text-xs text-muted-foreground mt-1">Click waypoints and rooms to create paths</p>}
           </div>
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {waypoints.map(wp => (
@@ -670,12 +760,24 @@ export const ImageMap = () => {
             {/* Paths visualization */}
             {showPaths && paths.map(path => {
               const wpA = waypoints.find(w => w.id === path.waypointA);
-              const wpB = waypoints.find(w => w.id === path.waypointB);
+              if (!wpA) return null;
               
-              if (!wpA || !wpB) return null;
+              let coordsA = getDisplayCoordinates(wpA.x, wpA.y);
+              let coordsB;
               
-              const coordsA = getDisplayCoordinates(wpA.x, wpA.y);
-              const coordsB = getDisplayCoordinates(wpB.x, wpB.y);
+              if (path.waypointB) {
+                // Waypoint to waypoint path
+                const wpB = waypoints.find(w => w.id === path.waypointB);
+                if (!wpB) return null;
+                coordsB = getDisplayCoordinates(wpB.x, wpB.y);
+              } else if (path.roomB) {
+                // Waypoint to room path
+                const roomB = rooms.find(r => r.id === path.roomB);
+                if (!roomB) return null;
+                coordsB = getDisplayCoordinates(roomB.x, roomB.y);
+              } else {
+                return null;
+              }
               
               return (
                 <svg key={path.id} className="absolute inset-0 w-full h-full pointer-events-none">
@@ -684,9 +786,9 @@ export const ImageMap = () => {
                     y1={coordsA.y}
                     x2={coordsB.x}
                     y2={coordsB.y}
-                    stroke="#10b981"
+                    stroke={path.roomB ? "#f59e0b" : "#10b981"}
                     strokeWidth="2"
-                    strokeDasharray="5,5"
+                    strokeDasharray={path.roomB ? "3,3" : "5,5"}
                   />
                 </svg>
               );

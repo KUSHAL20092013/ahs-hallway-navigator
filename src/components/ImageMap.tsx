@@ -159,11 +159,32 @@ export const ImageMap = () => {
     return nearest;
   };
 
+  // Line-of-sight checking to ensure paths don't go through rooms
+  const hasLineOfSight = (wp1: Waypoint, wp2: Waypoint): boolean => {
+    const steps = 20; // Number of points to check along the line
+    
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      const checkX = wp1.x + (wp2.x - wp1.x) * t;
+      const checkY = wp1.y + (wp2.y - wp1.y) * t;
+      
+      // Check if this point is too close to any room (indicating we're going through it)
+      for (const room of rooms) {
+        const distanceToRoom = Math.hypot(checkX - room.x, checkY - room.y);
+        // If we're within 3% of image width/height from a room, consider it blocked
+        if (distanceToRoom < 0.03) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
   const findOptimalPath = (start: Waypoint, end: Waypoint): Waypoint[] => {
     if (start.id === end.id) return [start];
     
-    // Build adjacency graph - connect waypoints within reasonable distance
-    const maxConnectionDistance = 0.15; // 15% of image width/height
+    // Build adjacency graph with line-of-sight checking
+    const maxConnectionDistance = 0.20; // Increased slightly to allow for more connections
     const graph = new Map<string, Waypoint[]>();
     
     // Initialize graph
@@ -171,12 +192,12 @@ export const ImageMap = () => {
       graph.set(wp.id, []);
     });
     
-    // Create connections between nearby waypoints
+    // Create connections between nearby waypoints with line-of-sight check
     waypoints.forEach(wp1 => {
       waypoints.forEach(wp2 => {
         if (wp1.id !== wp2.id) {
           const distance = Math.hypot(wp1.x - wp2.x, wp1.y - wp2.y);
-          if (distance <= maxConnectionDistance) {
+          if (distance <= maxConnectionDistance && hasLineOfSight(wp1, wp2)) {
             graph.get(wp1.id)!.push(wp2);
           }
         }

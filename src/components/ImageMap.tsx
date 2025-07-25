@@ -4,9 +4,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut, Eye, EyeOff } from 'lucide-react';
+import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut, Eye, EyeOff, Link } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { strategicWaypoints, isPathInCorridors, schoolCorridors, type StrategicWaypoint } from "@/data/schoolCorridors";
 
 interface Waypoint {
   id: string;
@@ -23,11 +22,20 @@ interface Room {
   y: number; // Percentage of natural image height (0-1)
 }
 
+interface Path {
+  id: string;
+  waypointA: string; // waypoint ID
+  waypointB: string; // waypoint ID
+}
+
 export const ImageMap = () => {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [paths, setPaths] = useState<Path[]>([]);
   const [isWaypointMode, setIsWaypointMode] = useState(false);
   const [isRoomMode, setIsRoomMode] = useState(false);
+  const [isPathMode, setIsPathMode] = useState(false);
+  const [selectedWaypointForPath, setSelectedWaypointForPath] = useState<string | null>(null);
   const [newPointName, setNewPointName] = useState('');
   const [selectedStart, setSelectedStart] = useState<Room | null>(null);
   const [selectedEnd, setSelectedEnd] = useState<Room | null>(null);
@@ -37,8 +45,7 @@ export const ImageMap = () => {
   const [roomSearchTerm, setRoomSearchTerm] = useState('');
   const [showRooms, setShowRooms] = useState(true);
   const [zoom, setZoom] = useState(1);
-  const [showCorridors, setShowCorridors] = useState(false);
-  const [useStrategicWaypoints, setUseStrategicWaypoints] = useState(false);
+  const [showPaths, setShowPaths] = useState(true);
   const imageRef = useRef<HTMLImageElement>(null);
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
@@ -102,13 +109,34 @@ export const ImageMap = () => {
     }
   };
 
-  const selectRoom = (room: Room) => {
-    if (!selectedStart) {
-      setSelectedStart(room);
-      toast({ title: `Start: ${room.name}` });
-    } else if (!selectedEnd && room.id !== selectedStart.id) {
-      setSelectedEnd(room);
-      toast({ title: `Destination: ${room.name}` });
+  const handleWaypointClick = (waypointId: string) => {
+    if (!isPathMode) return;
+    
+    if (!selectedWaypointForPath) {
+      setSelectedWaypointForPath(waypointId);
+      toast({ title: "Now click second waypoint to create path" });
+    } else if (selectedWaypointForPath !== waypointId) {
+      // Check if path already exists
+      const pathExists = paths.some(p => 
+        (p.waypointA === selectedWaypointForPath && p.waypointB === waypointId) ||
+        (p.waypointA === waypointId && p.waypointB === selectedWaypointForPath)
+      );
+      
+      if (pathExists) {
+        toast({ title: "Path already exists between these waypoints", variant: "destructive" });
+      } else {
+        const newPath: Path = {
+          id: `path-${Date.now()}`,
+          waypointA: selectedWaypointForPath,
+          waypointB: waypointId
+        };
+        setPaths(prev => [...prev, newPath]);
+        toast({ title: "Path created" });
+      }
+      setSelectedWaypointForPath(null);
+    } else {
+      setSelectedWaypointForPath(null);
+      toast({ title: "Path creation cancelled" });
     }
   };
 
@@ -118,21 +146,24 @@ export const ImageMap = () => {
       return;
     }
 
-    const currentWaypoints = waypoints;
-
-    if (currentWaypoints.length < 2) {
+    if (waypoints.length < 2) {
       toast({ title: "Need at least 2 waypoints for routing", variant: "destructive" });
       return;
     }
 
+    if (paths.length === 0) {
+      toast({ title: "Need to create paths between waypoints first", variant: "destructive" });
+      return;
+    }
+
     // Find nearest waypoints to start and end rooms
-    const startWaypoint = currentWaypoints.reduce((nearest, wp) => {
+    const startWaypoint = waypoints.reduce((nearest, wp) => {
       const distance = Math.hypot(wp.x - selectedStart.x, wp.y - selectedStart.y);
       const nearestDistance = Math.hypot(nearest.x - selectedStart.x, nearest.y - selectedStart.y);
       return distance < nearestDistance ? wp : nearest;
     });
 
-    const endWaypoint = currentWaypoints.reduce((nearest, wp) => {
+    const endWaypoint = waypoints.reduce((nearest, wp) => {
       const distance = Math.hypot(wp.x - selectedEnd.x, wp.y - selectedEnd.y);
       const nearestDistance = Math.hypot(nearest.x - selectedEnd.x, nearest.y - selectedEnd.y);
       return distance < nearestDistance ? wp : nearest;
@@ -149,6 +180,28 @@ export const ImageMap = () => {
     setRoute(path);
     console.log('Route calculated:', path);
     toast({ title: `Route found with ${path.length} waypoints` });
+  };
+
+  const deleteWaypoint = (id: string) => {
+    setWaypoints(prev => prev.filter(w => w.id !== id));
+    // Also remove any paths connected to this waypoint
+    setPaths(prev => prev.filter(p => p.waypointA !== id && p.waypointB !== id));
+    console.log('Waypoint deleted:', id);
+  };
+
+  const selectRoom = (room: Room) => {
+    if (!selectedStart) {
+      setSelectedStart(room);
+      toast({ title: `Start: ${room.name}` });
+    } else if (!selectedEnd && room.id !== selectedStart.id) {
+      setSelectedEnd(room);
+      toast({ title: `Destination: ${room.name}` });
+    }
+  };
+
+  const deletePath = (pathId: string) => {
+    setPaths(prev => prev.filter(p => p.id !== pathId));
+    toast({ title: "Path deleted" });
   };
 
   const findNearestWaypoint = (x: number, y: number): Waypoint | null => {
@@ -168,53 +221,27 @@ export const ImageMap = () => {
     return nearest;
   };
 
-  // Enhanced line-of-sight checking using corridors and room avoidance
-  const hasLineOfSight = (wp1: Waypoint, wp2: Waypoint): boolean => {
-    // Check if the path stays within defined corridors
-    if (!isPathInCorridors(wp1.x, wp1.y, wp2.x, wp2.y)) {
-      return false;
-    }
-    
-    const steps = 20;
-    for (let i = 1; i < steps; i++) {
-      const t = i / steps;
-      const checkX = wp1.x + (wp2.x - wp1.x) * t;
-      const checkY = wp1.y + (wp2.y - wp1.y) * t;
-      
-      // Check if this point is too close to any room
-      for (const room of rooms) {
-        const distanceToRoom = Math.hypot(checkX - room.x, checkY - room.y);
-        if (distanceToRoom < 0.03) {
-          return false;
-        }
-      }
-    }
-    return true;
-  };
 
   const findOptimalPath = (start: Waypoint, end: Waypoint): Waypoint[] => {
     if (start.id === end.id) return [start];
     
-    const currentWaypoints = waypoints;
-    
+    // Build adjacency graph using manually created paths
     const graph = new Map<string, Waypoint[]>();
     
     // Initialize graph
-    currentWaypoints.forEach(wp => {
+    waypoints.forEach(wp => {
       graph.set(wp.id, []);
     });
     
-    // Create connections between nearby waypoints with line-of-sight check
-    const maxConnectionDistance = 0.20;
-    currentWaypoints.forEach(wp1 => {
-      currentWaypoints.forEach(wp2 => {
-        if (wp1.id !== wp2.id) {
-          const distance = Math.hypot(wp1.x - wp2.x, wp1.y - wp2.y);
-          if (distance <= maxConnectionDistance && hasLineOfSight(wp1, wp2)) {
-            graph.get(wp1.id)!.push(wp2);
-          }
-        }
-      });
+    // Add connections based on manually created paths
+    paths.forEach(path => {
+      const waypointA = waypoints.find(wp => wp.id === path.waypointA);
+      const waypointB = waypoints.find(wp => wp.id === path.waypointB);
+      
+      if (waypointA && waypointB) {
+        graph.get(path.waypointA)!.push(waypointB);
+        graph.get(path.waypointB)!.push(waypointA); // bidirectional
+      }
     });
     
     // A* pathfinding algorithm with safety limits
@@ -225,7 +252,7 @@ export const ImageMap = () => {
     const fScore = new Map<string, number>();
     
     // Initialize scores
-    currentWaypoints.forEach(wp => {
+    waypoints.forEach(wp => {
       gScore.set(wp.id, Infinity);
       fScore.set(wp.id, Infinity);
     });
@@ -235,7 +262,7 @@ export const ImageMap = () => {
     
     // Safety limit to prevent infinite loops
     let iterations = 0;
-    const maxIterations = currentWaypoints.length * currentWaypoints.length;
+    const maxIterations = waypoints.length * waypoints.length;
     
     while (openSet.size > 0 && iterations < maxIterations) {
       iterations++;
@@ -256,7 +283,7 @@ export const ImageMap = () => {
         let currentId = end.id;
         while (cameFrom.has(currentId)) {
           currentId = cameFrom.get(currentId)!;
-          const waypoint = currentWaypoints.find(wp => wp.id === currentId);
+          const waypoint = waypoints.find(wp => wp.id === currentId);
           if (waypoint) path.unshift(waypoint);
         }
         return path;
@@ -269,7 +296,7 @@ export const ImageMap = () => {
       for (const neighbor of neighbors) {
         if (closedSet.has(neighbor.id)) continue;
         
-        const currentWp = currentWaypoints.find(wp => wp.id === current)!;
+        const currentWp = waypoints.find(wp => wp.id === current)!;
         const tentativeG = (gScore.get(current) || 0) + Math.hypot(currentWp.x - neighbor.x, currentWp.y - neighbor.y);
         
         if (tentativeG < (gScore.get(neighbor.id) || Infinity)) {
@@ -293,10 +320,6 @@ export const ImageMap = () => {
     toast({ title: "Route cleared" });
   };
 
-  const deleteWaypoint = (id: string) => {
-    setWaypoints(prev => prev.filter(wp => wp.id !== id));
-    toast({ title: "Waypoint deleted" });
-  };
 
   const deleteRoom = (id: string) => {
     setRooms(prev => prev.filter(room => room.id !== id));
@@ -330,57 +353,21 @@ export const ImageMap = () => {
 
   const exportData = () => {
     const data = {
-      rooms,
       waypoints,
-      exportDate: new Date().toISOString(),
-      coordinateSystem: 'percentage' // Flag to indicate coordinate system
+      rooms,
+      paths,
+      version: '2.0'
     };
     
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `floor-plan-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
+    a.download = 'school-navigation-data.json';
     a.click();
-    document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    toast({ title: "Floor plan exported successfully" });
-  };
-
-  // Migration helper for old absolute coordinates
-  const migrateCoordinates = (data: any) => {
-    if (!imageRef.current) return data;
-    
-    const naturalWidth = imageRef.current.naturalWidth;
-    const naturalHeight = imageRef.current.naturalHeight;
-    
-    if (naturalWidth === 0 || naturalHeight === 0) return data;
-    
-    // Check if migration is needed (old format doesn't have coordinateSystem flag)
-    const needsMigration = !data.coordinateSystem;
-    
-    if (needsMigration) {
-      // Convert absolute coordinates to percentages
-      if (data.rooms) {
-        data.rooms = data.rooms.map((room: any) => ({
-          ...room,
-          x: Math.min(Math.max(room.x / naturalWidth, 0), 1),
-          y: Math.min(Math.max(room.y / naturalHeight, 0), 1)
-        }));
-      }
-      
-      if (data.waypoints) {
-        data.waypoints = data.waypoints.map((waypoint: any) => ({
-          ...waypoint,
-          x: Math.min(Math.max(waypoint.x / naturalWidth, 0), 1),
-          y: Math.min(Math.max(waypoint.y / naturalHeight, 0), 1)
-        }));
-      }
-    }
-    
-    return data;
+    toast({ title: `Exported ${waypoints.length} waypoints, ${rooms.length} rooms, and ${paths.length} paths` });
   };
 
   const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -390,26 +377,17 @@ export const ImageMap = () => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        let data = JSON.parse(e.target?.result as string);
+        const data = JSON.parse(e.target?.result as string);
         
-        // Migrate old coordinate system if needed
-        data = migrateCoordinates(data);
+        if (data.waypoints) setWaypoints(data.waypoints);
+        if (data.rooms) setRooms(data.rooms);
+        if (data.paths) setPaths(data.paths || []);
         
-        if (data.rooms && Array.isArray(data.rooms)) {
-          setRooms(data.rooms);
-        }
-        if (data.waypoints && Array.isArray(data.waypoints)) {
-          setWaypoints(data.waypoints);
-        }
-        
-        // Clear current selection and route
-        setSelectedStart(null);
-        setSelectedEnd(null);
-        setRoute([]);
-        
-        toast({ title: "Floor plan imported successfully" });
+        toast({ 
+          title: `Imported ${data.waypoints?.length || 0} waypoints, ${data.rooms?.length || 0} rooms, and ${data.paths?.length || 0} paths` 
+        });
       } catch (error) {
-        toast({ title: "Failed to import file", variant: "destructive" });
+        toast({ title: "Failed to import data", variant: "destructive" });
       }
     };
     reader.readAsText(file);
@@ -466,6 +444,7 @@ export const ImageMap = () => {
               onClick={() => {
                 setIsWaypointMode(!isWaypointMode);
                 setIsRoomMode(false);
+                setIsPathMode(false);
               }}
             >
               <MapPin className="w-4 h-4 mr-1" />
@@ -477,18 +456,32 @@ export const ImageMap = () => {
               onClick={() => {
                 setIsRoomMode(!isRoomMode);
                 setIsWaypointMode(false);
+                setIsPathMode(false);
               }}
             >
               <Plus className="w-4 h-4 mr-1" />
               Rooms
             </Button>
             <Button
-              variant={showCorridors ? "default" : "outline"}
+              variant={isPathMode ? "default" : "outline"}
               size="sm"
-              onClick={() => setShowCorridors(!showCorridors)}
+              onClick={() => {
+                setIsPathMode(!isPathMode);
+                setIsWaypointMode(false);
+                setIsRoomMode(false);
+                setSelectedWaypointForPath(null);
+              }}
             >
-              {showCorridors ? <Eye className="w-4 h-4 mr-1" /> : <EyeOff className="w-4 h-4 mr-1" />}
-              Corridors
+              <Link className="w-4 h-4 mr-1" />
+              Paths
+            </Button>
+            <Button
+              variant={showPaths ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowPaths(!showPaths)}
+            >
+              {showPaths ? <Eye className="w-4 h-4 mr-1" /> : <EyeOff className="w-4 h-4 mr-1" />}
+              Show Paths
             </Button>
           </div>
         </div>
@@ -538,10 +531,35 @@ export const ImageMap = () => {
           </div>
         </div>
 
+        {/* Paths List */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold">Paths ({paths.length})</h3>
+          </div>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {paths.map(path => {
+              const wpA = waypoints.find(w => w.id === path.waypointA);
+              const wpB = waypoints.find(w => w.id === path.waypointB);
+              return (
+                <div key={path.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
+                  <span>{wpA?.name} ↔ {wpB?.name}</span>
+                  <Button size="sm" variant="ghost" onClick={() => deletePath(path.id)}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              );
+            })}
+            {paths.length === 0 && (
+              <p className="text-xs text-muted-foreground">No paths created. Use Path mode to connect waypoints.</p>
+            )}
+          </div>
+        </div>
+
         {/* Waypoints List */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold">Waypoints ({waypoints.length})</h3>
+            {isPathMode && <p className="text-xs text-muted-foreground mt-1">Click waypoints to create paths</p>}
           </div>
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {waypoints.map(wp => (
@@ -649,39 +667,45 @@ export const ImageMap = () => {
               }}
             />
             
-            {/* Corridor visualization */}
-            {showCorridors && schoolCorridors.map(corridor => {
-              const topLeft = getDisplayCoordinates(corridor.x, corridor.y);
-              const bottomRight = getDisplayCoordinates(
-                corridor.x + corridor.width, 
-                corridor.y + corridor.height
-              );
+            {/* Paths visualization */}
+            {showPaths && paths.map(path => {
+              const wpA = waypoints.find(w => w.id === path.waypointA);
+              const wpB = waypoints.find(w => w.id === path.waypointB);
+              
+              if (!wpA || !wpB) return null;
+              
+              const coordsA = getDisplayCoordinates(wpA.x, wpA.y);
+              const coordsB = getDisplayCoordinates(wpB.x, wpB.y);
               
               return (
-                <div
-                  key={corridor.id}
-                  className="absolute border-2 border-yellow-400 bg-yellow-100/20 pointer-events-none"
-                  style={{
-                    left: topLeft.x,
-                    top: topLeft.y,
-                    width: bottomRight.x - topLeft.x,
-                    height: bottomRight.y - topLeft.y
-                  }}
-                  title={corridor.name}
-                />
+                <svg key={path.id} className="absolute inset-0 w-full h-full pointer-events-none">
+                  <line
+                    x1={coordsA.x}
+                    y1={coordsA.y}
+                    x2={coordsB.x}
+                    y2={coordsB.y}
+                    stroke="#10b981"
+                    strokeWidth="2"
+                    strokeDasharray="5,5"
+                  />
+                </svg>
               );
             })}
             
             {/* Waypoints */}
             {waypoints.map(wp => {
               const { x, y } = getDisplayCoordinates(wp.x, wp.y);
+              const isSelectedForPath = selectedWaypointForPath === wp.id;
               
               return (
                 <div
                   key={wp.id}
-                  className="absolute w-3 h-3 bg-blue-500 border-2 border-white rounded-full shadow-lg pointer-events-none"
+                  className={`absolute w-3 h-3 border-2 border-white rounded-full shadow-lg cursor-pointer hover:scale-125 transition-transform ${
+                    isSelectedForPath ? 'bg-yellow-500' : 'bg-blue-500'
+                  } ${isPathMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
                   style={{ left: x - 6, top: y - 6 }}
                   title={wp.name}
+                  onClick={() => handleWaypointClick(wp.id)}
                 />
               );
             })}

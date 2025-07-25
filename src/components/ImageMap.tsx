@@ -255,10 +255,26 @@ export const ImageMap = () => {
       return;
     }
 
-    // Add the destination room as the final point in the route
-    const routeWithDestination = [...path];
+    // Add the starting room as the first point and destination room as the final point in the route
+    const routeWithStartAndDestination = [];
+    
+    // Add start room if it's not the same as the first waypoint
+    if (actualStartWaypoint.id !== selectedStart.id) {
+      const startPoint: Waypoint = {
+        id: selectedStart.id,
+        name: selectedStart.name,
+        x: selectedStart.x,
+        y: selectedStart.y,
+        type: 'room'
+      };
+      routeWithStartAndDestination.push(startPoint);
+    }
+    
+    // Add the calculated path
+    routeWithStartAndDestination.push(...path);
+    
+    // Add destination room if it's not the same as the last waypoint
     if (actualEndWaypoint.id !== selectedEnd.id) {
-      // Convert room to waypoint format for consistent rendering
       const destinationPoint: Waypoint = {
         id: selectedEnd.id,
         name: selectedEnd.name,
@@ -266,12 +282,12 @@ export const ImageMap = () => {
         y: selectedEnd.y,
         type: 'destination'
       };
-      routeWithDestination.push(destinationPoint);
+      routeWithStartAndDestination.push(destinationPoint);
     }
 
-    setRoute(routeWithDestination);
-    console.log('Route calculated:', routeWithDestination);
-    toast({ title: `Route found with ${routeWithDestination.length} points` });
+    setRoute(routeWithStartAndDestination);
+    console.log('Route calculated:', routeWithStartAndDestination);
+    toast({ title: `Route found with ${routeWithStartAndDestination.length} points` });
   };
 
   const deleteWaypoint = (id: string) => {

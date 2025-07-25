@@ -12,7 +12,7 @@ interface Waypoint {
   name: string;
   x: number; // Percentage of natural image width (0-1)
   y: number; // Percentage of natural image height (0-1)
-  type: 'corridor' | 'junction' | 'entrance' | 'room';
+  type: 'corridor' | 'junction' | 'entrance' | 'room' | 'destination';
 }
 
 interface Room {
@@ -255,9 +255,23 @@ export const ImageMap = () => {
       return;
     }
 
-    setRoute(path);
-    console.log('Route calculated:', path);
-    toast({ title: `Route found with ${path.length} waypoints` });
+    // Add the destination room as the final point in the route
+    const routeWithDestination = [...path];
+    if (actualEndWaypoint.id !== selectedEnd.id) {
+      // Convert room to waypoint format for consistent rendering
+      const destinationPoint: Waypoint = {
+        id: selectedEnd.id,
+        name: selectedEnd.name,
+        x: selectedEnd.x,
+        y: selectedEnd.y,
+        type: 'destination'
+      };
+      routeWithDestination.push(destinationPoint);
+    }
+
+    setRoute(routeWithDestination);
+    console.log('Route calculated:', routeWithDestination);
+    toast({ title: `Route found with ${routeWithDestination.length} points` });
   };
 
   const deleteWaypoint = (id: string) => {

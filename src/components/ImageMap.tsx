@@ -49,6 +49,7 @@ export const ImageMap = () => {
   const [showRooms, setShowRooms] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [showPaths, setShowPaths] = useState(true);
+  const [showWaypoints, setShowWaypoints] = useState(true);
   const imageRef = useRef<HTMLImageElement>(null);
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
@@ -679,8 +680,16 @@ export const ImageMap = () => {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold">Waypoints ({waypoints.length})</h3>
-            {isPathMode && <p className="text-xs text-muted-foreground mt-1">Click waypoints and rooms to create paths</p>}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowWaypoints(!showWaypoints)}
+              className="h-7 w-7 p-0"
+            >
+              {showWaypoints ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            </Button>
           </div>
+          {isPathMode && <p className="text-xs text-muted-foreground mt-1">Click waypoints and rooms to create paths</p>}
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {waypoints.map(wp => (
               <div key={wp.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
@@ -825,7 +834,7 @@ export const ImageMap = () => {
             })}
             
             {/* Waypoints */}
-            {waypoints.map(wp => {
+            {showWaypoints && waypoints.map(wp => {
               const { x, y } = getDisplayCoordinates(wp.x, wp.y);
               const isSelectedForPath = selectedWaypointForPath === wp.id;
               

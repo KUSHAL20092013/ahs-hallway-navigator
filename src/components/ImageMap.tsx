@@ -817,7 +817,7 @@ export const ImageMap = () => {
                 <div
                   key={wp.id}
                   className={`absolute w-3 h-3 border-2 border-white rounded-full shadow-lg cursor-pointer hover:scale-125 transition-transform ${
-                    isSelectedForPath ? 'bg-yellow-500' : 'bg-blue-500'
+                    isSelectedForPath ? 'bg-yellow-500' : 'bg-orange-500'
                   } ${isPathMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
                   style={{ left: x - 6, top: y - 6 }}
                   title={wp.name}

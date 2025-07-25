@@ -183,8 +183,9 @@ export const ImageMap = () => {
       });
     });
     
-    // A* pathfinding algorithm
+    // A* pathfinding algorithm with safety limits
     const openSet = new Set([start.id]);
+    const closedSet = new Set<string>();
     const cameFrom = new Map<string, string>();
     const gScore = new Map<string, number>();
     const fScore = new Map<string, number>();
@@ -198,7 +199,12 @@ export const ImageMap = () => {
     gScore.set(start.id, 0);
     fScore.set(start.id, Math.hypot(start.x - end.x, start.y - end.y));
     
-    while (openSet.size > 0) {
+    // Safety limit to prevent infinite loops
+    let iterations = 0;
+    const maxIterations = waypoints.length * waypoints.length;
+    
+    while (openSet.size > 0 && iterations < maxIterations) {
+      iterations++;
       // Find node with lowest fScore
       let current = '';
       let lowestF = Infinity;
@@ -223,9 +229,12 @@ export const ImageMap = () => {
       }
       
       openSet.delete(current);
+      closedSet.add(current);
       const neighbors = graph.get(current) || [];
       
       for (const neighbor of neighbors) {
+        if (closedSet.has(neighbor.id)) continue;
+        
         const currentWp = waypoints.find(wp => wp.id === current)!;
         const tentativeG = (gScore.get(current) || 0) + Math.hypot(currentWp.x - neighbor.x, currentWp.y - neighbor.y);
         
@@ -233,7 +242,9 @@ export const ImageMap = () => {
           cameFrom.set(neighbor.id, current);
           gScore.set(neighbor.id, tentativeG);
           fScore.set(neighbor.id, tentativeG + Math.hypot(neighbor.x - end.x, neighbor.y - end.y));
-          openSet.add(neighbor.id);
+          if (!openSet.has(neighbor.id)) {
+            openSet.add(neighbor.id);
+          }
         }
       }
     }

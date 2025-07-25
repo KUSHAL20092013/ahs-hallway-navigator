@@ -138,6 +138,7 @@ export const ImageMap = () => {
     }
 
     setRoute(path);
+    console.log('Route calculated:', path);
     toast({ title: `Route found with ${path.length} waypoints` });
   };
 
@@ -580,7 +581,6 @@ export const ImageMap = () => {
 
       {/* Floor Plan */}
       <div className="flex-1 relative overflow-hidden">
-        <div className="relative w-full h-full flex items-center justify-center">
         <div className="relative w-full h-full flex items-center justify-center overflow-auto">
             <img 
               ref={imageRef}
@@ -631,7 +631,7 @@ export const ImageMap = () => {
             
             {/* Route Line */}
             {route.length > 1 && (
-              <svg className="absolute inset-0 pointer-events-none">
+              <svg className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
                 <polyline
                   points={route.map(wp => {
                     const { x, y } = getDisplayCoordinates(wp.x, wp.y);
@@ -645,7 +645,6 @@ export const ImageMap = () => {
               </svg>
             )}
           </div>
-        </div>
         
         {/* Zoom Controls */}
         <div className="absolute top-4 right-4 flex flex-col gap-2">

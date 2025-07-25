@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { strategicWaypoints, isPathInCorridors, schoolCorridors, type StrategicWaypoint } from "@/data/schoolCorridors";
 
 interface Waypoint {
   id: string;
@@ -36,6 +37,8 @@ export const ImageMap = () => {
   const [roomSearchTerm, setRoomSearchTerm] = useState('');
   const [showRooms, setShowRooms] = useState(true);
   const [zoom, setZoom] = useState(1);
+  const [showCorridors, setShowCorridors] = useState(false);
+  const [useStrategicWaypoints, setUseStrategicWaypoints] = useState(true);
   const imageRef = useRef<HTMLImageElement>(null);
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
@@ -115,19 +118,27 @@ export const ImageMap = () => {
       return;
     }
 
-    if (waypoints.length < 2) {
+    const currentWaypoints = useStrategicWaypoints ? 
+      strategicWaypoints.map(sw => ({ id: sw.id, name: sw.name, x: sw.x, y: sw.y, type: sw.type as any })) : 
+      waypoints;
+
+    if (currentWaypoints.length < 2) {
       toast({ title: "Need at least 2 waypoints for routing", variant: "destructive" });
       return;
     }
 
     // Find nearest waypoints to start and end rooms
-    const startWaypoint = findNearestWaypoint(selectedStart.x, selectedStart.y);
-    const endWaypoint = findNearestWaypoint(selectedEnd.x, selectedEnd.y);
-    
-    if (!startWaypoint || !endWaypoint) {
-      toast({ title: "Could not find nearby waypoints", variant: "destructive" });
-      return;
-    }
+    const startWaypoint = currentWaypoints.reduce((nearest, wp) => {
+      const distance = Math.hypot(wp.x - selectedStart.x, wp.y - selectedStart.y);
+      const nearestDistance = Math.hypot(nearest.x - selectedStart.x, nearest.y - selectedStart.y);
+      return distance < nearestDistance ? wp : nearest;
+    });
+
+    const endWaypoint = currentWaypoints.reduce((nearest, wp) => {
+      const distance = Math.hypot(wp.x - selectedEnd.x, wp.y - selectedEnd.y);
+      const nearestDistance = Math.hypot(nearest.x - selectedEnd.x, nearest.y - selectedEnd.y);
+      return distance < nearestDistance ? wp : nearest;
+    });
 
     // Find optimal path using A* algorithm
     const path = findOptimalPath(startWaypoint, endWaypoint);
@@ -159,19 +170,22 @@ export const ImageMap = () => {
     return nearest;
   };
 
-  // Line-of-sight checking to ensure paths don't go through rooms
+  // Enhanced line-of-sight checking using corridors and room avoidance
   const hasLineOfSight = (wp1: Waypoint, wp2: Waypoint): boolean => {
-    const steps = 20; // Number of points to check along the line
+    // Check if the path stays within defined corridors
+    if (!isPathInCorridors(wp1.x, wp1.y, wp2.x, wp2.y)) {
+      return false;
+    }
     
+    const steps = 20;
     for (let i = 1; i < steps; i++) {
       const t = i / steps;
       const checkX = wp1.x + (wp2.x - wp1.x) * t;
       const checkY = wp1.y + (wp2.y - wp1.y) * t;
       
-      // Check if this point is too close to any room (indicating we're going through it)
+      // Check if this point is too close to any room
       for (const room of rooms) {
         const distanceToRoom = Math.hypot(checkX - room.x, checkY - room.y);
-        // If we're within 3% of image width/height from a room, consider it blocked
         if (distanceToRoom < 0.03) {
           return false;
         }
@@ -183,26 +197,39 @@ export const ImageMap = () => {
   const findOptimalPath = (start: Waypoint, end: Waypoint): Waypoint[] => {
     if (start.id === end.id) return [start];
     
-    // Build adjacency graph with line-of-sight checking
-    const maxConnectionDistance = 0.20; // Increased slightly to allow for more connections
+    const currentWaypoints = useStrategicWaypoints ? 
+      strategicWaypoints.map(sw => ({ id: sw.id, name: sw.name, x: sw.x, y: sw.y, type: sw.type as any })) : 
+      waypoints;
+    
     const graph = new Map<string, Waypoint[]>();
     
     // Initialize graph
-    waypoints.forEach(wp => {
+    currentWaypoints.forEach(wp => {
       graph.set(wp.id, []);
     });
     
-    // Create connections between nearby waypoints with line-of-sight check
-    waypoints.forEach(wp1 => {
-      waypoints.forEach(wp2 => {
-        if (wp1.id !== wp2.id) {
-          const distance = Math.hypot(wp1.x - wp2.x, wp1.y - wp2.y);
-          if (distance <= maxConnectionDistance && hasLineOfSight(wp1, wp2)) {
-            graph.get(wp1.id)!.push(wp2);
-          }
-        }
+    if (useStrategicWaypoints) {
+      // Use predefined connections for strategic waypoints
+      strategicWaypoints.forEach(wp => {
+        const connections = wp.connections
+          .map(connId => currentWaypoints.find(w => w.id === connId))
+          .filter(Boolean) as Waypoint[];
+        graph.set(wp.id, connections);
       });
-    });
+    } else {
+      // Create connections between nearby waypoints with line-of-sight check
+      const maxConnectionDistance = 0.20;
+      currentWaypoints.forEach(wp1 => {
+        currentWaypoints.forEach(wp2 => {
+          if (wp1.id !== wp2.id) {
+            const distance = Math.hypot(wp1.x - wp2.x, wp1.y - wp2.y);
+            if (distance <= maxConnectionDistance && hasLineOfSight(wp1, wp2)) {
+              graph.get(wp1.id)!.push(wp2);
+            }
+          }
+        });
+      });
+    }
     
     // A* pathfinding algorithm with safety limits
     const openSet = new Set([start.id]);
@@ -212,7 +239,7 @@ export const ImageMap = () => {
     const fScore = new Map<string, number>();
     
     // Initialize scores
-    waypoints.forEach(wp => {
+    currentWaypoints.forEach(wp => {
       gScore.set(wp.id, Infinity);
       fScore.set(wp.id, Infinity);
     });
@@ -222,7 +249,7 @@ export const ImageMap = () => {
     
     // Safety limit to prevent infinite loops
     let iterations = 0;
-    const maxIterations = waypoints.length * waypoints.length;
+    const maxIterations = currentWaypoints.length * currentWaypoints.length;
     
     while (openSet.size > 0 && iterations < maxIterations) {
       iterations++;
@@ -243,7 +270,7 @@ export const ImageMap = () => {
         let currentId = end.id;
         while (cameFrom.has(currentId)) {
           currentId = cameFrom.get(currentId)!;
-          const waypoint = waypoints.find(wp => wp.id === currentId);
+          const waypoint = currentWaypoints.find(wp => wp.id === currentId);
           if (waypoint) path.unshift(waypoint);
         }
         return path;
@@ -256,7 +283,7 @@ export const ImageMap = () => {
       for (const neighbor of neighbors) {
         if (closedSet.has(neighbor.id)) continue;
         
-        const currentWp = waypoints.find(wp => wp.id === current)!;
+        const currentWp = currentWaypoints.find(wp => wp.id === current)!;
         const tentativeG = (gScore.get(current) || 0) + Math.hypot(currentWp.x - neighbor.x, currentWp.y - neighbor.y);
         
         if (tentativeG < (gScore.get(neighbor.id) || Infinity)) {
@@ -446,14 +473,15 @@ export const ImageMap = () => {
         
         {/* Mode Controls */}
         <div className="space-y-3 mb-6">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button
-              variant={isWaypointMode ? "default" : "outline"}
+              variant={useStrategicWaypoints ? "outline" : (isWaypointMode ? "default" : "outline")}
               size="sm"
               onClick={() => {
                 setIsWaypointMode(!isWaypointMode);
                 setIsRoomMode(false);
               }}
+              disabled={useStrategicWaypoints}
             >
               <MapPin className="w-4 h-4 mr-1" />
               Waypoints
@@ -469,8 +497,23 @@ export const ImageMap = () => {
               <Plus className="w-4 h-4 mr-1" />
               Rooms
             </Button>
+            <Button
+              variant={useStrategicWaypoints ? "default" : "outline"}
+              size="sm"
+              onClick={() => setUseStrategicWaypoints(!useStrategicWaypoints)}
+            >
+              <Navigation className="w-4 h-4 mr-1" />
+              {useStrategicWaypoints ? 'Strategic' : 'Manual'}
+            </Button>
+            <Button
+              variant={showCorridors ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowCorridors(!showCorridors)}
+            >
+              {showCorridors ? <Eye className="w-4 h-4 mr-1" /> : <EyeOff className="w-4 h-4 mr-1" />}
+              Corridors
+            </Button>
           </div>
-          
         </div>
 
         {/* Save/Load Controls */}
@@ -521,15 +564,20 @@ export const ImageMap = () => {
         {/* Waypoints List */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold">Waypoints ({waypoints.length})</h3>
+            <h3 className="font-semibold">
+              Waypoints ({useStrategicWaypoints ? strategicWaypoints.length : waypoints.length})
+              {useStrategicWaypoints && <Badge variant="secondary" className="ml-2">Strategic</Badge>}
+            </h3>
           </div>
           <div className="space-y-1 max-h-32 overflow-y-auto">
-            {waypoints.map(wp => (
+            {(useStrategicWaypoints ? strategicWaypoints : waypoints).map(wp => (
               <div key={wp.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
                 <span>{wp.name}</span>
-                <Button size="sm" variant="ghost" onClick={() => deleteWaypoint(wp.id)}>
-                  <Trash2 className="w-3 h-3" />
-                </Button>
+                {!useStrategicWaypoints && (
+                  <Button size="sm" variant="ghost" onClick={() => deleteWaypoint(wp.id)}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                )}
               </div>
             ))}
           </div>
@@ -629,14 +677,39 @@ export const ImageMap = () => {
               }}
             />
             
+            {/* Corridor visualization */}
+            {showCorridors && schoolCorridors.map(corridor => {
+              const topLeft = getDisplayCoordinates(corridor.x, corridor.y);
+              const bottomRight = getDisplayCoordinates(
+                corridor.x + corridor.width, 
+                corridor.y + corridor.height
+              );
+              
+              return (
+                <div
+                  key={corridor.id}
+                  className="absolute border-2 border-yellow-400 bg-yellow-100/20 pointer-events-none"
+                  style={{
+                    left: topLeft.x,
+                    top: topLeft.y,
+                    width: bottomRight.x - topLeft.x,
+                    height: bottomRight.y - topLeft.y
+                  }}
+                  title={corridor.name}
+                />
+              );
+            })}
+            
             {/* Waypoints */}
-            {waypoints.map(wp => {
+            {(useStrategicWaypoints ? strategicWaypoints : waypoints).map(wp => {
               const { x, y } = getDisplayCoordinates(wp.x, wp.y);
               
               return (
                 <div
                   key={wp.id}
-                  className="absolute w-3 h-3 bg-orange-500 border-2 border-white rounded-full shadow-lg pointer-events-none"
+                  className={`absolute w-3 h-3 border-2 border-white rounded-full shadow-lg pointer-events-none ${
+                    useStrategicWaypoints ? 'bg-orange-500' : 'bg-blue-500'
+                  }`}
                   style={{ left: x - 6, top: y - 6 }}
                   title={wp.name}
                 />

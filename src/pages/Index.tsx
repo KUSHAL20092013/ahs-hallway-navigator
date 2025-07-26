@@ -1,7 +1,6 @@
 
 import { useState } from "react";
 import { ImageMap } from "@/components/ImageMap";
-import { PositioningStatus } from "@/components/PositioningStatus";
 import { FloorPlanSidebar } from "@/components/FloorPlanSidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -35,19 +34,10 @@ const Index = () => {
 
           {/* Main content - mobile optimized */}
           <main className="flex-1 p-4 pb-20">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-              {/* Map section - full width on mobile */}
-              <div className="lg:col-span-2 order-2 lg:order-1">
-                <div className="card-mobile animate-fade-in h-full">
-                  <ImageMap />
-                </div>
-              </div>
-              
-              {/* Positioning status - top on mobile */}
-              <div className="order-1 lg:order-2">
-                <div className="animate-fade-in animation-delay-200">
-                  <PositioningStatus />
-                </div>
+            <div className="w-full h-full">
+              {/* Map section - full width */}
+              <div className="card-mobile animate-fade-in h-full">
+                <ImageMap />
               </div>
             </div>
           </main>

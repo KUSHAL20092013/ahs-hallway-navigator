@@ -20,15 +20,7 @@ const Index = () => {
           <header className="bg-card shadow-[--shadow-card] border-b border-border">
             <div className="flex items-center justify-between px-4 py-4">
               <div className="flex items-center gap-3">
-                <SidebarTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="md:hidden h-10 w-10 p-0 border-primary/20 hover:bg-primary/5"
-                  >
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                </SidebarTrigger>
+                <SidebarTrigger className="md:hidden h-10 w-10 p-0 border-primary/20 hover:bg-primary/5 border rounded-md" />
                 <div>
                   <h1 className="text-2xl font-bold bg-gradient-patriotic bg-clip-text text-transparent">
                     School Navigator

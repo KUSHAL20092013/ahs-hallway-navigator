@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { CapacitorWifi } from 'capacitor-wifi';
+import { mockWiFiData } from './mockWiFiData';
 import type { WiFiNetwork, WiFiFingerprint, WiFiPositionResult, LocationWaypoint } from '@/types/wifi';
 
 export class WiFiPositioningService {
@@ -7,26 +7,18 @@ export class WiFiPositioningService {
   private isScanning = false;
 
   async isWiFiAvailable(): Promise<boolean> {
-    return Capacitor.isNativePlatform();
+    // Always return true for development mode
+    return true;
   }
 
   async scanWiFiNetworks(): Promise<WiFiNetwork[]> {
-    if (!await this.isWiFiAvailable()) {
-      throw new Error('WiFi scanning only available on native platforms');
-    }
-
     try {
-      const result = await CapacitorWifi.getWifiNetworks();
-      return result.networks.map(network => ({
-        ssid: network.ssid || 'Hidden Network',
-        bssid: network.bssid || '',
-        rssi: network.level || -100,
-        frequency: network.frequency || 2400,
-        timestamp: Date.now()
-      }));
+      // Use mock data for now - will be replaced with real WiFi scanning later
+      // Simulate scan at a default position
+      return mockWiFiData.simulateWiFiScan([400, 300]);
     } catch (error) {
       console.error('WiFi scan failed:', error);
-      throw error;
+      return [];
     }
   }
 

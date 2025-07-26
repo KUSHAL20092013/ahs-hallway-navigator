@@ -35,10 +35,10 @@ export function PositioningStatus() {
 
   const getMethodColor = (method: string) => {
     switch (method) {
-      case 'wifi': return 'bg-blue-500';
-      case 'gps': return 'bg-green-500';
-      case 'hybrid': return 'bg-purple-500';
-      default: return 'bg-gray-500';
+      case 'wifi': return 'bg-primary';
+      case 'gps': return 'bg-accent';
+      case 'hybrid': return 'bg-gradient-patriotic';
+      default: return 'bg-muted';
     }
   };
 
@@ -51,15 +51,18 @@ export function PositioningStatus() {
   return (
     <div className="space-y-4">
       {/* Current Position Status */}
-      <Card>
-        <CardHeader className="pb-3">
+      <Card className="card-mobile border-primary/20 shadow-[--shadow-patriotic]">
+        <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Position Status</CardTitle>
+            <CardTitle className="text-xl font-semibold bg-gradient-patriotic bg-clip-text text-transparent">
+              Position Status
+            </CardTitle>
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowSettings(!showSettings)}
+                className="h-10 w-10 p-0"
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -67,22 +70,26 @@ export function PositioningStatus() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowHistory(!showHistory)}
+                className="h-10 w-10 p-0"
               >
                 <History className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Current Method:</span>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+            <span className="text-sm font-medium text-foreground">Current Method:</span>
             {currentPosition ? (
-              <Badge variant="secondary" className="flex items-center gap-1">
+              <Badge 
+                variant="secondary" 
+                className="flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary border-primary/20"
+              >
                 {getMethodIcon(currentPosition.method)}
                 {currentPosition.method.toUpperCase()}
               </Badge>
             ) : (
-              <Badge variant="outline">No Signal</Badge>
+              <Badge variant="outline" className="border-accent/50 text-accent">No Signal</Badge>
             )}
           </div>
 
@@ -116,9 +123,21 @@ export function PositioningStatus() {
           <Button 
             onClick={scanPosition} 
             disabled={isScanning}
-            className="w-full"
+            variant="patriotic"
+            size="mobile"
+            className="w-full font-semibold"
           >
-            {isScanning ? 'Scanning...' : 'Scan Position'}
+            {isScanning ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Scanning...
+              </>
+            ) : (
+              <>
+                <MapPin className="h-5 w-5 mr-2" />
+                Scan Position
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -126,14 +145,21 @@ export function PositioningStatus() {
       {/* Settings Panel */}
       <Collapsible open={showSettings} onOpenChange={setShowSettings}>
         <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between">
-            Positioning Settings
-            <ChevronDown className="h-4 w-4" />
+          <Button 
+            variant="outline" 
+            size="mobile"
+            className="w-full justify-between border-primary/20 hover:bg-primary/5"
+          >
+            <div className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Positioning Settings
+            </div>
+            <ChevronDown className={`h-4 w-4 transition-transform ${showSettings ? 'rotate-180' : ''}`} />
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <Card>
-            <CardContent className="pt-6 space-y-4">
+          <Card className="card-mobile mt-2 border-primary/10">
+            <CardContent className="pt-6 space-y-6">
               <div className="flex items-center justify-between">
                 <Label htmlFor="wifi-enabled">WiFi Positioning</Label>
                 <Switch
@@ -187,17 +213,29 @@ export function PositioningStatus() {
       {/* Position History */}
       <Collapsible open={showHistory} onOpenChange={setShowHistory}>
         <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between">
-            Position History ({positionHistory.length})
-            <ChevronDown className="h-4 w-4" />
+          <Button 
+            variant="outline" 
+            size="mobile"
+            className="w-full justify-between border-accent/20 hover:bg-accent/5"
+          >
+            <div className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Position History ({positionHistory.length})
+            </div>
+            <ChevronDown className={`h-4 w-4 transition-transform ${showHistory ? 'rotate-180' : ''}`} />
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <Card>
-            <CardHeader className="pb-3">
+          <Card className="card-mobile mt-2 border-accent/10">
+            <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Recent Positions</CardTitle>
-                <Button variant="outline" size="sm" onClick={clearHistory}>
+                <CardTitle className="text-lg font-semibold">Recent Positions</CardTitle>
+                <Button 
+                  variant="america" 
+                  size="sm" 
+                  onClick={clearHistory}
+                  className="h-10 px-4"
+                >
                   Clear
                 </Button>
               </div>

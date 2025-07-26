@@ -2,32 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
-/* American High School Navigation App Design System */
+/* American Patriotic Navigation App - Blue, Red, White Theme */
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 215 25% 27%;
+    --background: 0 0% 100%;
+    --foreground: 218 54% 20%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 27%;
+    --card-foreground: 218 54% 20%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 27%;
+    --popover-foreground: 218 54% 20%;
 
-    --primary: 214 84% 56%;
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 214 84% 50%;
+    --primary-hover: 217 91% 55%;
+    --primary-glow: 217 91% 70%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 215 25% 27%;
+    --secondary: 210 40% 98%;
+    --secondary-foreground: 218 54% 20%;
 
     --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted-foreground: 218 20% 50%;
 
-    --accent: 43 96% 56%;
-    --accent-foreground: 215 25% 27%;
-    --accent-hover: 43 96% 50%;
+    --accent: 0 84% 60%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 0 84% 55%;
 
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
@@ -38,9 +39,17 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 214 84% 56%;
+    --border: 210 40% 90%;
+    --input: 210 40% 90%;
+    --ring: 217 91% 60%;
+
+    /* Patriotic gradients */
+    --gradient-patriotic: linear-gradient(135deg, hsl(217 91% 60%), hsl(0 84% 60%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(210 40% 98%));
+    
+    /* Enhanced shadows */
+    --shadow-patriotic: 0 10px 30px -10px hsl(217 91% 60% / 0.2);
+    --shadow-card: 0 4px 20px -8px hsl(0 0% 0% / 0.1);
 
     --radius: 0.5rem;
 
@@ -62,33 +71,44 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 218 54% 4%;
+    --foreground: 0 0% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 218 54% 6%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 218 54% 6%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 217 91% 70%;
+    --primary-foreground: 218 54% 4%;
+    --primary-hover: 217 91% 75%;
+    --primary-glow: 217 91% 80%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 218 54% 10%;
+    --secondary-foreground: 0 0% 95%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 218 54% 10%;
+    --muted-foreground: 218 20% 70%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 0 84% 65%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 0 84% 70%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 218 54% 15%;
+    --input: 218 54% 15%;
+    --ring: 217 91% 70%;
+
+    /* Dark mode gradients */
+    --gradient-patriotic: linear-gradient(135deg, hsl(217 91% 70%), hsl(0 84% 65%));
+    --gradient-subtle: linear-gradient(180deg, hsl(218 54% 4%), hsl(218 54% 6%));
+    
+    /* Enhanced dark shadows */
+    --shadow-patriotic: 0 10px 30px -10px hsl(217 91% 70% / 0.3);
+    --shadow-card: 0 4px 20px -8px hsl(0 0% 0% / 0.4);
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -106,6 +126,64 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Mobile-first responsive typography */
+  h1 {
+    @apply text-2xl font-bold tracking-tight md:text-3xl lg:text-4xl;
+  }
+
+  h2 {
+    @apply text-xl font-semibold tracking-tight md:text-2xl lg:text-3xl;
+  }
+
+  h3 {
+    @apply text-lg font-semibold tracking-tight md:text-xl;
+  }
+
+  /* Enhanced mobile touch targets */
+  button, [role="button"] {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Smooth scrolling for mobile */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Patriotic button variants */
+  .btn-patriotic {
+    @apply bg-gradient-to-r from-primary to-accent text-white shadow-[--shadow-patriotic] hover:shadow-lg transition-all duration-300;
+  }
+
+  .btn-america {
+    @apply bg-accent text-accent-foreground hover:bg-accent-hover shadow-md transition-all duration-200;
+  }
+
+  /* Mobile-optimized card */
+  .card-mobile {
+    @apply bg-card border border-border shadow-[--shadow-card] rounded-xl p-4 md:p-6;
+  }
+
+  /* Gradient backgrounds */
+  .bg-patriotic {
+    background: var(--gradient-patriotic);
+  }
+
+  .bg-subtle {
+    background: var(--gradient-subtle);
+  }
+
+  /* Mobile navigation */
+  .nav-mobile {
+    @apply fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 z-50;
+  }
+
+  /* Touch-friendly spacing */
+  .mobile-spacing {
+    @apply p-4 md:p-6 lg:p-8;
   }
 }

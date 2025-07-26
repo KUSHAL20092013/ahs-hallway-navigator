@@ -841,10 +841,10 @@ export const ImageMap = () => {
               return (
                 <div
                   key={wp.id}
-                  className={`absolute w-3 h-3 border-2 border-white rounded-full shadow-lg cursor-pointer hover:scale-125 transition-transform ${
-                    isSelectedForPath ? 'bg-yellow-500' : 'bg-orange-500'
+                  className={`absolute w-6 h-6 md:w-4 md:h-4 border-2 border-white rounded-full shadow-[--shadow-patriotic] cursor-pointer hover:scale-125 transition-all duration-200 touch-manipulation ${
+                    isSelectedForPath ? 'bg-accent animate-patriotic-pulse' : 'bg-primary'
                   } ${isPathMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
-                  style={{ left: x - 6, top: y - 6 }}
+                  style={{ left: x - 12, top: y - 12 }}
                   title={wp.name}
                   onClick={() => handleWaypointClick(wp.id)}
                 />
@@ -858,11 +858,11 @@ export const ImageMap = () => {
               return (
                 <div
                   key={room.id}
-                  className={`absolute w-4 h-4 border-2 border-white rounded-full shadow-lg cursor-pointer ${
-                    selectedStart?.id === room.id ? 'bg-green-500' :
-                    selectedEnd?.id === room.id ? 'bg-red-500' : 'bg-blue-500'
+                  className={`absolute w-8 h-8 md:w-6 md:h-6 border-2 border-white rounded-lg shadow-[--shadow-patriotic] cursor-pointer transition-all duration-200 touch-manipulation hover:scale-110 ${
+                    selectedStart?.id === room.id ? 'bg-primary' :
+                    selectedEnd?.id === room.id ? 'bg-accent' : 'bg-primary/80'
                   }`}
-                  style={{ left: x - 8, top: y - 8 }}
+                  style={{ left: x - 16, top: y - 16 }}
                   onClick={() => selectRoom(room)}
                   title={room.name}
                 />
@@ -878,7 +878,7 @@ export const ImageMap = () => {
                     return `${x},${y}`;
                   }).join(' ')}
                   fill="none"
-                  stroke="hsl(214, 84%, 56%)"
+                  stroke="hsl(var(--primary))"
                   strokeWidth="3"
                   strokeOpacity="0.8"
                 />
@@ -911,12 +911,12 @@ export const ImageMap = () => {
           </div>
         </div>
 
-        {/* Instructions */}
-        <div className="absolute top-4 left-4 bg-background/95 p-3 rounded border">
-          <p className="text-sm text-muted-foreground">
-            {isWaypointMode ? 'Click to place waypoints (auto-numbered WP1, WP2, WP3...)' :
-             isRoomMode ? 'Click to place rooms (auto-numbered 1, 2, 3...)' :
-             'Select mode to start placing points'}
+        {/* Mobile-Optimized Instructions */}
+        <div className="absolute top-4 left-4 bg-card/95 backdrop-blur-sm p-3 rounded-lg border border-primary/20 shadow-[--shadow-card]">
+          <p className="text-sm font-medium text-foreground">
+            {isWaypointMode ? '📍 Tap to place waypoints' :
+             isRoomMode ? '🏠 Tap to place rooms' :
+             '👆 Select a mode to start'}
           </p>
         </div>
       </div>

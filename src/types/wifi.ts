@@ -28,5 +28,5 @@ export interface WiFiPositionResult {
   coordinates: [number, number];
   accuracy: number; // Confidence level 0-1
   nearestWaypoint?: LocationWaypoint;
-  method: 'wifi' | 'gps' | 'manual';
+  method: 'wifi' | 'gps' | 'manual' | 'hybrid';
 }

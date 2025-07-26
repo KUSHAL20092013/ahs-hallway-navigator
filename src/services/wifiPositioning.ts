@@ -1,27 +1,6 @@
 import { Capacitor } from '@capacitor/core';
+import { CapacitorWifi } from 'capacitor-wifi';
 import type { WiFiNetwork, WiFiFingerprint, WiFiPositionResult, LocationWaypoint } from '@/types/wifi';
-
-// Mock WiFi interface for development - will be replaced with actual plugin
-interface WiFiPlugin {
-  scan(): Promise<{ networks: Array<{ ssid?: string; bssid?: string; level?: number; frequency?: number }> }>;
-}
-
-// Placeholder WiFi implementation
-const WiFi: WiFiPlugin = {
-  async scan() {
-    // Mock data for development/testing
-    if (!Capacitor.isNativePlatform()) {
-      return {
-        networks: [
-          { ssid: 'SchoolWiFi_Main', bssid: '00:11:22:33:44:55', level: -45, frequency: 2400 },
-          { ssid: 'SchoolWiFi_Guest', bssid: '00:11:22:33:44:56', level: -67, frequency: 2400 },
-          { ssid: 'AdminNetwork', bssid: '00:11:22:33:44:57', level: -72, frequency: 5000 }
-        ]
-      };
-    }
-    throw new Error('WiFi scanning requires native platform and proper plugin setup');
-  }
-};
 
 export class WiFiPositioningService {
   private fingerprints: WiFiFingerprint[] = [];
@@ -33,22 +12,21 @@ export class WiFiPositioningService {
 
   async scanWiFiNetworks(): Promise<WiFiNetwork[]> {
     if (!await this.isWiFiAvailable()) {
-      console.warn('WiFi scanning not available on this platform');
-      return [];
+      throw new Error('WiFi scanning only available on native platforms');
     }
 
     try {
-      const result = await WiFi.scan();
+      const result = await CapacitorWifi.getWifiNetworks();
       return result.networks.map(network => ({
-        ssid: network.ssid || 'Unknown',
+        ssid: network.ssid || 'Hidden Network',
         bssid: network.bssid || '',
         rssi: network.level || -100,
-        frequency: network.frequency || 0,
+        frequency: network.frequency || 2400,
         timestamp: Date.now()
       }));
     } catch (error) {
       console.error('WiFi scan failed:', error);
-      return [];
+      throw error;
     }
   }
 

@@ -1,13 +1,8 @@
 
 import { ImageMap } from "@/components/ImageMap";
 import { PositioningStatus } from "@/components/PositioningStatus";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown } from "lucide-react";
-import { useState } from "react";
 
 const Index = () => {
-  const [isFloorPlanOpen, setIsFloorPlanOpen] = useState(true);
-
   return (
     <div className="min-h-screen bg-gradient-subtle">
       {/* Mobile-first header */}
@@ -28,20 +23,7 @@ const Index = () => {
           {/* Map section - full width on mobile */}
           <div className="xl:col-span-2 order-2 xl:order-1">
             <div className="card-mobile animate-fade-in">
-              <Collapsible open={isFloorPlanOpen} onOpenChange={setIsFloorPlanOpen}>
-                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 text-left hover:bg-accent/50 transition-colors rounded-lg">
-                  <div>
-                    <h2 className="text-lg font-semibold text-primary">Floor Plan Editor</h2>
-                    <p className="text-sm text-muted-foreground">Interactive school map navigation</p>
-                  </div>
-                  <ChevronDown className={`h-5 w-5 text-america transition-transform duration-200 ${isFloorPlanOpen ? 'rotate-180' : ''}`} />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="overflow-hidden">
-                  <div className="pt-2">
-                    <ImageMap />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
+              <ImageMap />
             </div>
           </div>
           

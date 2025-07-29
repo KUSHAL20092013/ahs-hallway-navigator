@@ -1,11 +1,12 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut, Eye, EyeOff, Link } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import navigationData from '@/data/navigationData.json';
 
 interface Waypoint {
   id: string;
@@ -33,6 +34,13 @@ export const ImageMap = () => {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [paths, setPaths] = useState<Path[]>([]);
+
+  // Load navigation data on component mount
+  useEffect(() => {
+    setWaypoints((navigationData.waypoints || []) as Waypoint[]);
+    setRooms(navigationData.rooms || []);
+    setPaths(navigationData.paths || []);
+  }, []);
   const [isWaypointMode, setIsWaypointMode] = useState(false);
   const [isRoomMode, setIsRoomMode] = useState(false);
   const [isPathMode, setIsPathMode] = useState(false);

@@ -659,9 +659,9 @@ export const ImageMap = () => {
                     return `${x},${y}`;
                   }).join(' ')}
                   fill="none"
-                  stroke="hsl(var(--primary))"
+                  stroke="#ef4444"
                   strokeWidth="3"
-                  strokeOpacity="0.8"
+                  strokeOpacity="0.9"
                 />
               </svg>
             )}

@@ -1,0 +1,107 @@
+{
+  "waypoints": [
+    {
+      "id": "wp1",
+      "name": "Main Entrance",
+      "coordinates": [45, 45],
+      "type": "entrance"
+    },
+    {
+      "id": "wp2", 
+      "name": "Library Entrance",
+      "coordinates": [45, 50],
+      "type": "entrance"
+    },
+    {
+      "id": "wp3",
+      "name": "Science Wing Entry",
+      "coordinates": [40, 35],
+      "type": "entrance"
+    },
+    {
+      "id": "wp4",
+      "name": "Cafeteria Junction",
+      "coordinates": [50, 55],
+      "type": "junction"
+    },
+    {
+      "id": "wp5",
+      "name": "Athletics Junction", 
+      "coordinates": [80, 50],
+      "type": "junction"
+    }
+  ],
+  "rooms": [
+    {
+      "id": "101",
+      "name": "Room 101",
+      "building": "Building 1",
+      "floor": 1,
+      "coordinates": [25, 45],
+      "type": "classroom"
+    },
+    {
+      "id": "LIBRARY",
+      "name": "Library",
+      "building": "Main Building", 
+      "floor": 1,
+      "coordinates": [45, 50],
+      "type": "facility"
+    },
+    {
+      "id": "CAFE",
+      "name": "Cafeteria",
+      "building": "Main Building",
+      "floor": 1, 
+      "coordinates": [50, 55],
+      "type": "facility"
+    },
+    {
+      "id": "GYM",
+      "name": "Gymnasium",
+      "building": "Athletics",
+      "floor": 1,
+      "coordinates": [85, 45],
+      "type": "facility"
+    },
+    {
+      "id": "CHEM1",
+      "name": "Chemistry Lab 1",
+      "building": "Science Wing",
+      "floor": 1,
+      "coordinates": [40, 35],
+      "type": "lab"
+    }
+  ],
+  "paths": [
+    {
+      "id": "path1",
+      "from": "wp1",
+      "to": "wp2",
+      "waypoints": [[45, 45], [45, 50]],
+      "bidirectional": true
+    },
+    {
+      "id": "path2", 
+      "from": "wp2",
+      "to": "wp4",
+      "waypoints": [[45, 50], [50, 55]],
+      "bidirectional": true
+    },
+    {
+      "id": "path3",
+      "from": "wp1", 
+      "to": "wp3",
+      "waypoints": [[45, 45], [40, 35]],
+      "bidirectional": true
+    },
+    {
+      "id": "path4",
+      "from": "wp4",
+      "to": "wp5", 
+      "waypoints": [[50, 55], [80, 50]],
+      "bidirectional": true
+    }
+  ],
+  "version": "2.0"
+}

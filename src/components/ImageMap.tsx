@@ -1,12 +1,11 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut, Eye, EyeOff, Link, RotateCcw } from 'lucide-react';
+import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut, Eye, EyeOff, Link } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { NavigationDataService } from '@/services/navigationDataService';
 
 interface Waypoint {
   id: string;
@@ -19,11 +18,8 @@ interface Waypoint {
 interface Room {
   id: string;
   name: string;
-  building: string;
-  floor: number;
   x: number; // Percentage of natural image width (0-1)
   y: number; // Percentage of natural image height (0-1)
-  type: 'classroom' | 'lab' | 'office' | 'facility';
 }
 
 interface Path {
@@ -55,19 +51,6 @@ export const ImageMap = () => {
   const [showPaths, setShowPaths] = useState(true);
   const [showWaypoints, setShowWaypoints] = useState(true);
   const imageRef = useRef<HTMLImageElement>(null);
-
-  // Load persistent data on component mount - commented out due to format compatibility
-  // useEffect(() => {
-  //   const loadData = () => {
-  //     try {
-  //       const data = NavigationDataService.loadData();
-  //       // Convert and load data here when formats are compatible
-  //     } catch (error) {
-  //       console.error('Failed to load navigation data:', error);
-  //     }
-  //   };
-  //   loadData();
-  // }, [toast]);
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
     if (!imageRef.current) return;
@@ -122,11 +105,8 @@ export const ImageMap = () => {
       const room: Room = {
         id: `room-${Date.now()}`,
         name: roomNumber.toString(),
-        building: 'Main Building',
-        floor: 1,
         x: percentX,
-        y: percentY,
-        type: 'classroom'
+        y: percentY
       };
       setRooms(prev => [...prev, room]);
       toast({ title: `Room ${roomNumber} placed` });
@@ -487,99 +467,48 @@ export const ImageMap = () => {
   };
 
   const exportData = () => {
-    NavigationDataService.exportData({
-      waypoints: waypoints.map(wp => ({
-        id: wp.id,
-        name: wp.name,
-        coordinates: [wp.x * 100, wp.y * 100] as [number, number],
-        type: wp.type
-      })),
-      rooms: rooms.map(room => ({
-        id: room.id,
-        name: room.name,
-        building: room.building || 'Unknown',
-        floor: room.floor || 1,
-        coordinates: [room.x * 100, room.y * 100] as [number, number],
-        type: room.type || 'classroom'
-      })),
-      paths: [], // Simplified for now
+    const data = {
+      waypoints,
+      rooms,
+      paths,
       version: '2.0'
-    });
+    };
     
-    toast({ title: `Exported ${waypoints.length} waypoints and ${rooms.length} rooms` });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'school-navigation-data.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast({ title: `Exported ${waypoints.length} waypoints, ${rooms.length} rooms, and ${paths.length} paths` });
   };
 
-  const importData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    try {
-      const data = await NavigationDataService.importData(file);
-      
-      // Convert imported data to component format
-      const importedWaypoints: Waypoint[] = data.waypoints.map(wp => ({
-        id: wp.id,
-        name: wp.name,
-        x: wp.coordinates[0] / 100,
-        y: wp.coordinates[1] / 100,
-        type: wp.type as Waypoint['type']
-      }));
-      
-      const importedRooms: Room[] = data.rooms.map(room => ({
-        id: room.id,
-        name: room.name,
-        building: room.building,
-        floor: room.floor,
-        x: room.coordinates[0] / 100,
-        y: room.coordinates[1] / 100,
-        type: room.type as Room['type']
-      }));
-      
-      setWaypoints(importedWaypoints);
-      setRooms(importedRooms);
-      
-      toast({ 
-        title: `Imported ${importedWaypoints.length} waypoints and ${importedRooms.length} rooms` 
-      });
-    } catch (error) {
-      toast({ title: "Failed to import data", variant: "destructive" });
-    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        
+        if (data.waypoints) setWaypoints(data.waypoints);
+        if (data.rooms) setRooms(data.rooms);
+        if (data.paths) setPaths(data.paths || []);
+        
+        toast({ 
+          title: `Imported ${data.waypoints?.length || 0} waypoints, ${data.rooms?.length || 0} rooms, and ${data.paths?.length || 0} paths` 
+        });
+      } catch (error) {
+        toast({ title: "Failed to import data", variant: "destructive" });
+      }
+    };
+    reader.readAsText(file);
     
     // Reset the input
     event.target.value = '';
-  };
-
-  const resetToDefault = () => {
-    const data = NavigationDataService.resetToDefault();
-    
-    // Convert to component format
-    const defaultWaypoints: Waypoint[] = data.waypoints.map(wp => ({
-      id: wp.id,
-      name: wp.name,
-      x: wp.coordinates[0] / 100,
-      y: wp.coordinates[1] / 100,
-      type: wp.type as Waypoint['type']
-    }));
-    
-    const defaultRooms: Room[] = data.rooms.map(room => ({
-      id: room.id,
-      name: room.name,
-      building: room.building,
-      floor: room.floor,
-      x: room.coordinates[0] / 100,
-      y: room.coordinates[1] / 100,
-      type: room.type as Room['type']
-    }));
-    
-    setWaypoints(defaultWaypoints);
-    setRooms(defaultRooms);
-    setPaths([]);
-    clearRoute();
-    
-    toast({ 
-      title: "Reset to default data", 
-      description: `Loaded ${defaultWaypoints.length} waypoints and ${defaultRooms.length} rooms`
-    });
   };
 
   const zoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
@@ -694,10 +623,6 @@ export const ImageMap = () => {
                 className="hidden"
               />
             </label>
-            <Button size="sm" onClick={resetToDefault} variant="outline">
-              <RotateCcw className="w-4 h-4 mr-1" />
-              Reset
-            </Button>
           </div>
         </div>
 

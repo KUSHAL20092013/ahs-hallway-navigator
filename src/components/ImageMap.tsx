@@ -556,85 +556,9 @@ export const ImageMap = () => {
     <div className="w-full h-screen flex bg-background">
       {/* Control Panel */}
       <div className="w-80 p-4 border-r bg-card overflow-y-auto">
-        <h2 className="text-xl font-bold mb-4">Floor Plan Editor</h2>
+        <h2 className="text-xl font-bold mb-4">School Navigation</h2>
         
-        {/* Mode Controls */}
-        <div className="space-y-3 mb-6">
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              variant={isWaypointMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setIsWaypointMode(!isWaypointMode);
-                setIsRoomMode(false);
-                setIsPathMode(false);
-              }}
-            >
-              <MapPin className="w-4 h-4 mr-1" />
-              Waypoints
-            </Button>
-            <Button
-              variant={isRoomMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setIsRoomMode(!isRoomMode);
-                setIsWaypointMode(false);
-                setIsPathMode(false);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Rooms
-            </Button>
-            <Button
-              variant={isPathMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setIsPathMode(!isPathMode);
-                setIsWaypointMode(false);
-                setIsRoomMode(false);
-                setSelectedWaypointForPath(null);
-              }}
-            >
-              <Link className="w-4 h-4 mr-1" />
-              Paths
-            </Button>
-            <Button
-              variant={showPaths ? "default" : "outline"}
-              size="sm"
-              onClick={() => setShowPaths(!showPaths)}
-            >
-              {showPaths ? <Eye className="w-4 h-4 mr-1" /> : <EyeOff className="w-4 h-4 mr-1" />}
-              Show Paths
-            </Button>
-          </div>
-        </div>
-
-        {/* Save/Load Controls */}
-        <div className="space-y-3 mb-6">
-          <h3 className="font-semibold">Save/Load</h3>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={exportData} variant="outline">
-              <Download className="w-4 h-4 mr-1" />
-              Export
-            </Button>
-            <label className="cursor-pointer">
-              <Button size="sm" variant="outline" asChild>
-                <span>
-                  <Upload className="w-4 h-4 mr-1" />
-                  Import
-                </span>
-              </Button>
-              <input
-                type="file"
-                accept=".json"
-                onChange={importData}
-                className="hidden"
-              />
-            </label>
-          </div>
-        </div>
-
-        {/* Route Controls */}
+        {/* Navigation Controls */}
         <div className="space-y-3 mb-6">
           <h3 className="font-semibold">Navigation</h3>
           {selectedStart && (
@@ -654,63 +578,7 @@ export const ImageMap = () => {
           </div>
         </div>
 
-        {/* Paths List */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold">Paths ({paths.length})</h3>
-          </div>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {paths.map(path => {
-              const wpA = waypoints.find(w => w.id === path.waypointA);
-              const wpB = path.waypointB ? waypoints.find(w => w.id === path.waypointB) : null;
-              const roomB = path.roomB ? rooms.find(r => r.id === path.roomB) : null;
-              
-              const pathLabel = wpB 
-                ? `${wpA?.name} ↔ ${wpB?.name}` 
-                : `${wpA?.name} ↔ ${roomB?.name}`;
-              
-              return (
-                <div key={path.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
-                  <span>{pathLabel}</span>
-                  <Button size="sm" variant="ghost" onClick={() => deletePath(path.id)}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
-              );
-            })}
-            {paths.length === 0 && (
-              <p className="text-xs text-muted-foreground">No paths created. Use Path mode to connect waypoints and rooms.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Waypoints List */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold">Waypoints ({waypoints.length})</h3>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowWaypoints(!showWaypoints)}
-              className="h-7 w-7 p-0"
-            >
-              {showWaypoints ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-            </Button>
-          </div>
-          {isPathMode && <p className="text-xs text-muted-foreground mt-1">Click waypoints and rooms to create paths</p>}
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {waypoints.map(wp => (
-              <div key={wp.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
-                <span>{wp.name}</span>
-                <Button size="sm" variant="ghost" onClick={() => deleteWaypoint(wp.id)}>
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Rooms List */}
+        {/* Room Search and List */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold">Rooms ({rooms.length})</h3>
@@ -735,51 +603,15 @@ export const ImageMap = () => {
             />
           </div>
           
-          <div className="space-y-1 max-h-32 overflow-y-auto">
+          <div className="space-y-1 max-h-96 overflow-y-auto">
             {filteredRooms.map(room => (
               <div key={room.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
-                {editingRoomId === room.id ? (
-                  <div className="flex items-center gap-2 flex-1">
-                    <Input
-                      value={editingRoomName}
-                      onChange={(e) => setEditingRoomName(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') saveRoomEdit();
-                        if (e.key === 'Escape') cancelRoomEdit();
-                      }}
-                      onBlur={saveRoomEdit}
-                      className="h-6 text-xs"
-                      autoFocus
-                    />
-                  </div>
-                ) : (
-                  <span 
-                    className="cursor-pointer hover:text-primary flex-1"
-                    onClick={() => selectRoom(room)}
-                  >
-                    {room.name}
-                  </span>
-                )}
-                <div className="flex gap-1">
-                  {editingRoomId !== room.id && (
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={() => startEditingRoom(room)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <Edit3 className="w-3 h-3" />
-                    </Button>
-                  )}
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={() => deleteRoom(room.id)}
-                    className="h-6 w-6 p-0"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
+                <span 
+                  className="cursor-pointer hover:text-primary flex-1"
+                  onClick={() => selectRoom(room)}
+                >
+                  {room.name}
+                </span>
               </div>
             ))}
           </div>
@@ -793,8 +625,7 @@ export const ImageMap = () => {
               ref={imageRef}
               src="/school-floorplan.jpg" 
               alt="School Floor Plan"
-              className="w-full h-full object-contain cursor-crosshair transition-transform duration-200"
-              onClick={handleImageClick}
+              className="w-full h-full object-contain transition-transform duration-200"
               draggable={false}
               style={{ 
                 transform: `scale(${zoom})`,
@@ -844,17 +675,13 @@ export const ImageMap = () => {
             {/* Waypoints */}
             {showWaypoints && waypoints.map(wp => {
               const { x, y } = getDisplayCoordinates(wp.x, wp.y);
-              const isSelectedForPath = selectedWaypointForPath === wp.id;
               
               return (
                 <div
                   key={wp.id}
-                  className={`absolute w-6 h-6 md:w-4 md:h-4 border-2 border-white rounded-full shadow-[--shadow-patriotic] cursor-pointer hover:scale-125 transition-all duration-200 touch-manipulation ${
-                    isSelectedForPath ? 'bg-accent animate-patriotic-pulse' : 'bg-primary'
-                  } ${isPathMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
+                  className="absolute w-6 h-6 md:w-4 md:h-4 border-2 border-white rounded-full shadow-[--shadow-patriotic] transition-all duration-200 touch-manipulation bg-primary pointer-events-none"
                   style={{ left: x - 12, top: y - 12 }}
                   title={wp.name}
-                  onClick={() => handleWaypointClick(wp.id)}
                 />
               );
             })}
@@ -919,12 +746,10 @@ export const ImageMap = () => {
           </div>
         </div>
 
-        {/* Mobile-Optimized Instructions */}
+        {/* Instructions */}
         <div className="absolute top-4 left-4 bg-card/95 backdrop-blur-sm p-3 rounded-lg border border-primary/20 shadow-[--shadow-card]">
           <p className="text-sm font-medium text-foreground">
-            {isWaypointMode ? '📍 Tap to place waypoints' :
-             isRoomMode ? '🏠 Tap to place rooms' :
-             '👆 Select a mode to start'}
+            Click rooms to select start and destination for navigation
           </p>
         </div>
       </div>

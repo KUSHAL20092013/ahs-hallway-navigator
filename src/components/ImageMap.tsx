@@ -51,6 +51,7 @@ export const ImageMap = () => {
   const [selectedStart, setSelectedStart] = useState<Room | null>(null);
   const [selectedEnd, setSelectedEnd] = useState<Room | null>(null);
   const [route, setRoute] = useState<Waypoint[]>([]);
+  const [directions, setDirections] = useState<string[]>([]);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editingRoomName, setEditingRoomName] = useState('');
   const [roomSearchTerm, setRoomSearchTerm] = useState('');
@@ -293,6 +294,8 @@ export const ImageMap = () => {
     }
 
     setRoute(routeWithStartAndDestination);
+    const stepDirections = calculateDirections(routeWithStartAndDestination);
+    setDirections(stepDirections);
     console.log('Route calculated:', routeWithStartAndDestination);
     toast({ title: `Route found with ${routeWithStartAndDestination.length} points` });
   };
@@ -438,6 +441,7 @@ export const ImageMap = () => {
     setSelectedStart(null);
     setSelectedEnd(null);
     setRoute([]);
+    setDirections([]);
     toast({ title: "Route cleared" });
   };
 
@@ -550,6 +554,90 @@ export const ImageMap = () => {
     return { x, y };
   };
 
+  const calculateDirections = (routePoints: Waypoint[]): string[] => {
+    if (routePoints.length < 2) return [];
+    
+    const directions: string[] = [];
+    
+    // Get natural image dimensions for pixel calculations
+    const naturalWidth = imageRef.current?.naturalWidth || 1;
+    const naturalHeight = imageRef.current?.naturalHeight || 1;
+    
+    for (let i = 0; i < routePoints.length - 1; i++) {
+      const current = routePoints[i];
+      const next = routePoints[i + 1];
+      
+      // Convert percentage coordinates to pixel coordinates
+      const currentX = current.x * naturalWidth;
+      const currentY = current.y * naturalHeight;
+      const nextX = next.x * naturalWidth;
+      const nextY = next.y * naturalHeight;
+      
+      // Calculate distance in pixels
+      const distance = Math.sqrt((nextX - currentX) ** 2 + (nextY - currentY) ** 2);
+      
+      // Calculate bearing (angle from north)
+      const bearing = Math.atan2(nextX - currentX, currentY - nextY) * 180 / Math.PI;
+      const normalizedBearing = (bearing + 360) % 360;
+      
+      // Determine direction based on bearing
+      let direction = '';
+      if (normalizedBearing >= 337.5 || normalizedBearing < 22.5) direction = 'north';
+      else if (normalizedBearing >= 22.5 && normalizedBearing < 67.5) direction = 'northeast';
+      else if (normalizedBearing >= 67.5 && normalizedBearing < 112.5) direction = 'east';
+      else if (normalizedBearing >= 112.5 && normalizedBearing < 157.5) direction = 'southeast';
+      else if (normalizedBearing >= 157.5 && normalizedBearing < 202.5) direction = 'south';
+      else if (normalizedBearing >= 202.5 && normalizedBearing < 247.5) direction = 'southwest';
+      else if (normalizedBearing >= 247.5 && normalizedBearing < 292.5) direction = 'west';
+      else direction = 'northwest';
+      
+      if (i === 0) {
+        // First step
+        directions.push(`Start at ${current.name} and head ${direction} for ${Math.round(distance)}px`);
+      } else if (i === routePoints.length - 2) {
+        // Last step
+        const previousBearing = i > 0 ? 
+          Math.atan2(currentX - (routePoints[i-1].x * naturalWidth), (routePoints[i-1].y * naturalHeight) - currentY) * 180 / Math.PI : 0;
+        const normalizedPrevBearing = (previousBearing + 360) % 360;
+        
+        // Calculate turn direction
+        let turnDirection = getTurnDirection(normalizedPrevBearing, normalizedBearing);
+        
+        if (turnDirection !== 'straight') {
+          directions.push(`Turn ${turnDirection} and continue ${direction} for ${Math.round(distance)}px to reach ${next.name}`);
+        } else {
+          directions.push(`Continue ${direction} for ${Math.round(distance)}px to reach ${next.name}`);
+        }
+      } else {
+        // Middle steps
+        const previousBearing = Math.atan2(currentX - (routePoints[i-1].x * naturalWidth), (routePoints[i-1].y * naturalHeight) - currentY) * 180 / Math.PI;
+        const normalizedPrevBearing = (previousBearing + 360) % 360;
+        
+        // Calculate turn direction
+        let turnDirection = getTurnDirection(normalizedPrevBearing, normalizedBearing);
+        
+        if (turnDirection !== 'straight') {
+          directions.push(`Turn ${turnDirection} and head ${direction} for ${Math.round(distance)}px`);
+        } else {
+          directions.push(`Continue ${direction} for ${Math.round(distance)}px`);
+        }
+      }
+    }
+    
+    return directions;
+  };
+  
+  const getTurnDirection = (fromBearing: number, toBearing: number): 'left' | 'right' | 'straight' => {
+    let diff = toBearing - fromBearing;
+    
+    // Normalize the difference to [-180, 180]
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    
+    if (Math.abs(diff) < 30) return 'straight'; // Within 30 degrees is considered straight
+    return diff > 0 ? 'right' : 'left';
+  };
+
   return (
     <div className="w-full h-screen flex bg-background">
       {/* Control Panel */}
@@ -575,6 +663,23 @@ export const ImageMap = () => {
             </Button>
           </div>
         </div>
+
+        {/* Turn-by-Turn Directions */}
+        {directions.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-semibold mb-2">Directions</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {directions.map((direction, index) => (
+                <div key={index} className="flex items-start gap-2 p-2 bg-muted rounded text-sm">
+                  <Badge variant="outline" className="min-w-6 h-6 flex items-center justify-center text-xs">
+                    {index + 1}
+                  </Badge>
+                  <span className="text-sm leading-relaxed">{direction}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Room Search and List */}
         <div>

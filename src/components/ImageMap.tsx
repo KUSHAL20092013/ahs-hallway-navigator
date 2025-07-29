@@ -56,8 +56,6 @@ export const ImageMap = () => {
   const [roomSearchTerm, setRoomSearchTerm] = useState('');
   const [showRooms, setShowRooms] = useState(true);
   const [zoom, setZoom] = useState(1);
-  const [showPaths, setShowPaths] = useState(true);
-  const [showWaypoints, setShowWaypoints] = useState(true);
   const imageRef = useRef<HTMLImageElement>(null);
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
@@ -634,58 +632,6 @@ export const ImageMap = () => {
                 minHeight: '100%'
               }}
             />
-            
-            {/* Paths visualization */}
-            {showPaths && paths.map(path => {
-              const wpA = waypoints.find(w => w.id === path.waypointA);
-              if (!wpA) return null;
-              
-              let coordsA = getDisplayCoordinates(wpA.x, wpA.y);
-              let coordsB;
-              
-              if (path.waypointB) {
-                // Waypoint to waypoint path
-                const wpB = waypoints.find(w => w.id === path.waypointB);
-                if (!wpB) return null;
-                coordsB = getDisplayCoordinates(wpB.x, wpB.y);
-              } else if (path.roomB) {
-                // Waypoint to room path
-                const roomB = rooms.find(r => r.id === path.roomB);
-                if (!roomB) return null;
-                coordsB = getDisplayCoordinates(roomB.x, roomB.y);
-              } else {
-                return null;
-              }
-              
-              return (
-                <svg key={path.id} className="absolute inset-0 w-full h-full pointer-events-none">
-                  <line
-                    x1={coordsA.x}
-                    y1={coordsA.y}
-                    x2={coordsB.x}
-                    y2={coordsB.y}
-                    stroke={path.roomB ? "#f59e0b" : "#10b981"}
-                    strokeWidth="2"
-                    strokeDasharray={path.roomB ? "3,3" : "5,5"}
-                  />
-                </svg>
-              );
-            })}
-            
-            {/* Waypoints */}
-            {showWaypoints && waypoints.map(wp => {
-              const { x, y } = getDisplayCoordinates(wp.x, wp.y);
-              
-              return (
-                <div
-                  key={wp.id}
-                  className="absolute w-6 h-6 md:w-4 md:h-4 border-2 border-white rounded-full shadow-[--shadow-patriotic] transition-all duration-200 touch-manipulation bg-primary pointer-events-none"
-                  style={{ left: x - 12, top: y - 12 }}
-                  title={wp.name}
-                />
-              );
-            })}
-            
             {/* Rooms */}
             {showRooms && rooms.map(room => {
               const { x, y } = getDisplayCoordinates(room.x, room.y);
@@ -693,11 +639,11 @@ export const ImageMap = () => {
               return (
                 <div
                   key={room.id}
-                  className={`absolute w-8 h-8 md:w-6 md:h-6 border-2 border-white rounded-lg shadow-[--shadow-patriotic] cursor-pointer transition-all duration-200 touch-manipulation hover:scale-110 ${
+                  className={`absolute w-3 h-3 border border-white rounded-sm shadow-sm cursor-pointer transition-all duration-200 hover:scale-150 ${
                     selectedStart?.id === room.id ? 'bg-primary' :
                     selectedEnd?.id === room.id ? 'bg-accent' : 'bg-primary/80'
                   }`}
-                  style={{ left: x - 16, top: y - 16 }}
+                  style={{ left: x - 6, top: y - 6 }}
                   onClick={() => selectRoom(room)}
                   title={room.name}
                 />

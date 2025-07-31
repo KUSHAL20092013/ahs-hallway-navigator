@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut, Eye, EyeOff, Link } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import navigationData from '@/data/navigationData.json';
+import { gpsPositioning } from '@/services/gpsPositioning';
+import type { WiFiPositionResult } from '@/types/wifi';
 
 interface Waypoint {
   id: string;
@@ -57,7 +59,17 @@ export const ImageMap = () => {
   const [roomSearchTerm, setRoomSearchTerm] = useState('');
   const [showRooms, setShowRooms] = useState(true);
   const [zoom, setZoom] = useState(1);
+  const [currentLocation, setCurrentLocation] = useState<{ x: number; y: number } | null>(null);
+  const [isTracking, setIsTracking] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
+
+  // GPS corner coordinates for the map
+  const mapCorners = {
+    topLeft: { lat: 37.566092, lng: -122.017120 },
+    topRight: { lat: 37.564643, lng: -122.013955 },
+    bottomLeft: { lat: 37.564194, lng: -122.018535 },
+    bottomRight: { lat: 37.562864, lng: -122.016039 }
+  };
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
     if (!imageRef.current) return;
@@ -521,6 +533,85 @@ export const ImageMap = () => {
     event.target.value = '';
   };
 
+  // GPS coordinate conversion functions
+  const convertGPSToPercent = (lat: number, lng: number): { x: number; y: number } => {
+    // Use bilinear interpolation to map GPS coordinates to image percentage coordinates
+    const { topLeft, topRight, bottomLeft, bottomRight } = mapCorners;
+    
+    // Calculate interpolation factors
+    const latRange = topLeft.lat - bottomLeft.lat; // Total latitude range
+    const lngRange = topRight.lng - topLeft.lng; // Total longitude range
+    
+    // Normalize the input coordinates within the map bounds
+    const latFactor = (lat - bottomLeft.lat) / latRange;
+    const lngFactor = (lng - topLeft.lng) / lngRange;
+    
+    // Clamp values to ensure they're within bounds
+    const clampedLatFactor = Math.max(0, Math.min(1, latFactor));
+    const clampedLngFactor = Math.max(0, Math.min(1, lngFactor));
+    
+    return {
+      x: clampedLngFactor, // longitude maps to x-axis
+      y: 1 - clampedLatFactor // latitude maps to y-axis (inverted because image coordinates start from top)
+    };
+  };
+
+  const getCurrentGPSLocation = async () => {
+    try {
+      setIsTracking(true);
+      const position = await gpsPositioning.getCurrentPosition();
+      
+      if (position && position.coordinates) {
+        const [lng, lat] = position.coordinates;
+        
+        // Check if coordinates are within the map bounds
+        const { topLeft, topRight, bottomLeft, bottomRight } = mapCorners;
+        if (lat >= bottomLeft.lat && lat <= topLeft.lat && 
+            lng >= topLeft.lng && lng <= topRight.lng) {
+          
+          const percentCoords = convertGPSToPercent(lat, lng);
+          setCurrentLocation(percentCoords);
+          
+          // Auto-select current location as start if no start is selected
+          if (!selectedStart) {
+            const currentLocationRoom: Room = {
+              id: 'current-location',
+              name: 'Your Location',
+              x: percentCoords.x,
+              y: percentCoords.y
+            };
+            setSelectedStart(currentLocationRoom);
+            toast({ title: "Current location set as start" });
+          }
+        } else {
+          toast({ title: "You are outside the mapped area", variant: "destructive" });
+        }
+      } else {
+        toast({ title: "Unable to get GPS location", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error('GPS error:', error);
+      toast({ title: "GPS positioning failed", variant: "destructive" });
+    } finally {
+      setIsTracking(false);
+    }
+  };
+
+  // Start continuous GPS tracking
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isTracking) {
+      interval = setInterval(() => {
+        getCurrentGPSLocation();
+      }, 3000); // Update every 3 seconds
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isTracking]);
+
   const zoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
   const zoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
 
@@ -653,13 +744,23 @@ export const ImageMap = () => {
           {selectedEnd && (
             <Badge variant="secondary">End: {selectedEnd.name}</Badge>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button size="sm" onClick={calculateRoute} disabled={!selectedStart || !selectedEnd}>
               <Navigation className="w-4 h-4 mr-1" />
               Route
             </Button>
             <Button size="sm" variant="outline" onClick={clearRoute}>
               Clear
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={getCurrentGPSLocation}
+              disabled={isTracking}
+              className="text-xs"
+            >
+              <MapPin className="w-4 h-4 mr-1" />
+              {isTracking ? 'Locating...' : 'My Location'}
             </Button>
           </div>
         </div>
@@ -737,6 +838,18 @@ export const ImageMap = () => {
                 minHeight: '100%'
               }}
             />
+            {/* Current Location (Pink Dot) */}
+            {currentLocation && (
+              <div
+                className="absolute w-4 h-4 bg-pink-500 border-2 border-white rounded-full shadow-lg animate-pulse"
+                style={{ 
+                  left: getDisplayCoordinates(currentLocation.x, currentLocation.y).x - 8, 
+                  top: getDisplayCoordinates(currentLocation.x, currentLocation.y).y - 8 
+                }}
+                title="Your Current Location"
+              />
+            )}
+
             {/* Rooms */}
             {showRooms && rooms.map(room => {
               const { x, y } = getDisplayCoordinates(room.x, room.y);

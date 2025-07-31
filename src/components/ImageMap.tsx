@@ -692,6 +692,9 @@ export const ImageMap = () => {
     const naturalWidth = imageRef.current?.naturalWidth || 1;
     const naturalHeight = imageRef.current?.naturalHeight || 1;
     
+    // Track the walker's current facing direction
+    let currentFacingBearing = 0;
+    
     for (let i = 0; i < routePoints.length - 1; i++) {
       const current = routePoints[i];
       const next = routePoints[i + 1];
@@ -707,51 +710,47 @@ export const ImageMap = () => {
       const distanceFeet = pixelsToFeet(distancePixels);
       totalDistance += distanceFeet;
       
-      // Calculate bearing (angle from north)
-      const bearing = Math.atan2(nextX - currentX, currentY - nextY) * 180 / Math.PI;
-      const normalizedBearing = (bearing + 360) % 360;
+      // Calculate bearing (angle from north) for this segment
+      const segmentBearing = Math.atan2(nextX - currentX, currentY - nextY) * 180 / Math.PI;
+      const normalizedSegmentBearing = (segmentBearing + 360) % 360;
       
-      // Determine direction based on bearing
+      // Determine cardinal direction for this segment
       let direction = '';
-      if (normalizedBearing >= 337.5 || normalizedBearing < 22.5) direction = 'north';
-      else if (normalizedBearing >= 22.5 && normalizedBearing < 67.5) direction = 'northeast';
-      else if (normalizedBearing >= 67.5 && normalizedBearing < 112.5) direction = 'east';
-      else if (normalizedBearing >= 112.5 && normalizedBearing < 157.5) direction = 'southeast';
-      else if (normalizedBearing >= 157.5 && normalizedBearing < 202.5) direction = 'south';
-      else if (normalizedBearing >= 202.5 && normalizedBearing < 247.5) direction = 'southwest';
-      else if (normalizedBearing >= 247.5 && normalizedBearing < 292.5) direction = 'west';
+      if (normalizedSegmentBearing >= 337.5 || normalizedSegmentBearing < 22.5) direction = 'north';
+      else if (normalizedSegmentBearing >= 22.5 && normalizedSegmentBearing < 67.5) direction = 'northeast';
+      else if (normalizedSegmentBearing >= 67.5 && normalizedSegmentBearing < 112.5) direction = 'east';
+      else if (normalizedSegmentBearing >= 112.5 && normalizedSegmentBearing < 157.5) direction = 'southeast';
+      else if (normalizedSegmentBearing >= 157.5 && normalizedSegmentBearing < 202.5) direction = 'south';
+      else if (normalizedSegmentBearing >= 202.5 && normalizedSegmentBearing < 247.5) direction = 'southwest';
+      else if (normalizedSegmentBearing >= 247.5 && normalizedSegmentBearing < 292.5) direction = 'west';
       else direction = 'northwest';
       
       if (i === 0) {
-        // First step
+        // First step - establish initial facing direction
+        currentFacingBearing = normalizedSegmentBearing;
         directions.push(`Start at ${current.name} and head ${direction} for ${Math.round(distanceFeet)} feet`);
-      } else if (i === routePoints.length - 2) {
-        // Last step
-        const previousBearing = i > 0 ? 
-          Math.atan2(currentX - (routePoints[i-1].x * naturalWidth), (routePoints[i-1].y * naturalHeight) - currentY) * 180 / Math.PI : 0;
-        const normalizedPrevBearing = (previousBearing + 360) % 360;
-        
-        // Calculate turn direction
-        let turnDirection = getTurnDirection(normalizedPrevBearing, normalizedBearing);
-        
-        if (turnDirection !== 'straight') {
-          directions.push(`Turn ${turnDirection} and continue ${direction} for ${Math.round(distanceFeet)} feet to reach ${next.name}`);
-        } else {
-          directions.push(`Continue ${direction} for ${Math.round(distanceFeet)} feet to reach ${next.name}`);
-        }
       } else {
-        // Middle steps
-        const previousBearing = Math.atan2(currentX - (routePoints[i-1].x * naturalWidth), (routePoints[i-1].y * naturalHeight) - currentY) * 180 / Math.PI;
-        const normalizedPrevBearing = (previousBearing + 360) % 360;
+        // Calculate turn direction relative to walker's current facing direction
+        const turnDirection = getWalkerTurnDirection(currentFacingBearing, normalizedSegmentBearing);
         
-        // Calculate turn direction
-        let turnDirection = getTurnDirection(normalizedPrevBearing, normalizedBearing);
-        
-        if (turnDirection !== 'straight') {
-          directions.push(`Turn ${turnDirection} and head ${direction} for ${Math.round(distanceFeet)} feet`);
+        if (i === routePoints.length - 2) {
+          // Last step
+          if (turnDirection !== 'straight') {
+            directions.push(`Turn ${turnDirection} and walk ${Math.round(distanceFeet)} feet to reach ${next.name}`);
+          } else {
+            directions.push(`Continue straight for ${Math.round(distanceFeet)} feet to reach ${next.name}`);
+          }
         } else {
-          directions.push(`Continue ${direction} for ${Math.round(distanceFeet)} feet`);
+          // Middle steps
+          if (turnDirection !== 'straight') {
+            directions.push(`Turn ${turnDirection} and walk ${Math.round(distanceFeet)} feet`);
+          } else {
+            directions.push(`Continue straight for ${Math.round(distanceFeet)} feet`);
+          }
         }
+        
+        // Update facing direction after the turn
+        currentFacingBearing = normalizedSegmentBearing;
       }
     }
     
@@ -763,15 +762,16 @@ export const ImageMap = () => {
     return directions;
   };
   
-  const getTurnDirection = (fromBearing: number, toBearing: number): 'left' | 'right' | 'straight' => {
-    let diff = toBearing - fromBearing;
+  // Calculate turn direction from walker's perspective
+  const getWalkerTurnDirection = (currentFacing: number, newBearing: number): 'left' | 'right' | 'straight' => {
+    let diff = newBearing - currentFacing;
     
     // Normalize the difference to [-180, 180]
     if (diff > 180) diff -= 360;
     if (diff < -180) diff += 360;
     
     if (Math.abs(diff) < 30) return 'straight'; // Within 30 degrees is considered straight
-    return diff > 0 ? 'right' : 'left';
+    return diff > 0 ? 'right' : 'left'; // Positive diff = turn right, negative = turn left
   };
 
   return (

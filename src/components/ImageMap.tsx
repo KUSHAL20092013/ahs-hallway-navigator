@@ -71,6 +71,43 @@ export const ImageMap = () => {
     bottomRight: { lat: 37.562864, lng: -122.016039 }
   };
 
+  // Calculate real-world dimensions of the map
+  const calculateMapDimensions = () => {
+    const { topLeft, topRight, bottomLeft, bottomRight } = mapCorners;
+    
+    // Calculate approximate distances using GPS coordinates
+    // 1 degree latitude ≈ 364,000 feet
+    // 1 degree longitude ≈ 364,000 * cos(latitude) feet
+    const avgLatitude = (topLeft.lat + topRight.lat + bottomLeft.lat + bottomRight.lat) / 4;
+    const cosLatitude = Math.cos(avgLatitude * Math.PI / 180);
+    
+    // Map height (latitude difference)
+    const latDiff = topLeft.lat - bottomLeft.lat;
+    const mapHeightFeet = latDiff * 364000;
+    
+    // Map width (longitude difference) 
+    const lngDiff = topRight.lng - topLeft.lng;
+    const mapWidthFeet = lngDiff * 364000 * cosLatitude;
+    
+    return { width: Math.abs(mapWidthFeet), height: Math.abs(mapHeightFeet) };
+  };
+
+  // Convert pixel distance to feet
+  const pixelsToFeet = (pixels: number): number => {
+    if (!imageRef.current) return pixels;
+    
+    const naturalWidth = imageRef.current.naturalWidth;
+    const naturalHeight = imageRef.current.naturalHeight;
+    const { width: mapWidthFeet, height: mapHeightFeet } = calculateMapDimensions();
+    
+    // Calculate feet per pixel (using average of width and height ratios)
+    const feetPerPixelX = mapWidthFeet / naturalWidth;
+    const feetPerPixelY = mapHeightFeet / naturalHeight;
+    const feetPerPixel = (feetPerPixelX + feetPerPixelY) / 2;
+    
+    return pixels * feetPerPixel;
+  };
+
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
     if (!imageRef.current) return;
     
@@ -649,6 +686,7 @@ export const ImageMap = () => {
     if (routePoints.length < 2) return [];
     
     const directions: string[] = [];
+    let totalDistance = 0;
     
     // Get natural image dimensions for pixel calculations
     const naturalWidth = imageRef.current?.naturalWidth || 1;
@@ -664,8 +702,10 @@ export const ImageMap = () => {
       const nextX = next.x * naturalWidth;
       const nextY = next.y * naturalHeight;
       
-      // Calculate distance in pixels
-      const distance = Math.sqrt((nextX - currentX) ** 2 + (nextY - currentY) ** 2);
+      // Calculate distance in pixels, then convert to feet
+      const distancePixels = Math.sqrt((nextX - currentX) ** 2 + (nextY - currentY) ** 2);
+      const distanceFeet = pixelsToFeet(distancePixels);
+      totalDistance += distanceFeet;
       
       // Calculate bearing (angle from north)
       const bearing = Math.atan2(nextX - currentX, currentY - nextY) * 180 / Math.PI;
@@ -684,7 +724,7 @@ export const ImageMap = () => {
       
       if (i === 0) {
         // First step
-        directions.push(`Start at ${current.name} and head ${direction} for ${Math.round(distance)}px`);
+        directions.push(`Start at ${current.name} and head ${direction} for ${Math.round(distanceFeet)} feet`);
       } else if (i === routePoints.length - 2) {
         // Last step
         const previousBearing = i > 0 ? 
@@ -695,9 +735,9 @@ export const ImageMap = () => {
         let turnDirection = getTurnDirection(normalizedPrevBearing, normalizedBearing);
         
         if (turnDirection !== 'straight') {
-          directions.push(`Turn ${turnDirection} and continue ${direction} for ${Math.round(distance)}px to reach ${next.name}`);
+          directions.push(`Turn ${turnDirection} and continue ${direction} for ${Math.round(distanceFeet)} feet to reach ${next.name}`);
         } else {
-          directions.push(`Continue ${direction} for ${Math.round(distance)}px to reach ${next.name}`);
+          directions.push(`Continue ${direction} for ${Math.round(distanceFeet)} feet to reach ${next.name}`);
         }
       } else {
         // Middle steps
@@ -708,11 +748,16 @@ export const ImageMap = () => {
         let turnDirection = getTurnDirection(normalizedPrevBearing, normalizedBearing);
         
         if (turnDirection !== 'straight') {
-          directions.push(`Turn ${turnDirection} and head ${direction} for ${Math.round(distance)}px`);
+          directions.push(`Turn ${turnDirection} and head ${direction} for ${Math.round(distanceFeet)} feet`);
         } else {
-          directions.push(`Continue ${direction} for ${Math.round(distance)}px`);
+          directions.push(`Continue ${direction} for ${Math.round(distanceFeet)} feet`);
         }
       }
+    }
+    
+    // Add total distance summary
+    if (totalDistance > 0) {
+      directions.push(`\nTotal distance: ${Math.round(totalDistance)} feet (approximately ${Math.round(totalDistance/4)} seconds walking)`);
     }
     
     return directions;

@@ -1,12 +1,14 @@
+
 import React, { useState, useRef, useEffect } from 'react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ZoomIn, ZoomOut, Target } from 'lucide-react';
+import { MapPin, Plus, Navigation, Trash2, Edit3, Download, Upload, Search, ZoomIn, ZoomOut, Eye, EyeOff, Link } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import navigationData from '@/data/navigationData.json';
 import { gpsPositioning } from '@/services/gpsPositioning';
 import type { WiFiPositionResult } from '@/types/wifi';
-import { schoolRooms } from '@/data/schoolRooms';
 
 interface Waypoint {
   id: string;
@@ -30,36 +32,10 @@ interface Path {
   roomB?: string; // room ID (optional for waypoint-to-room paths)
 }
 
-interface ExternalRoom {
-  id: string;
-  name: string;
-  building: string;
-  floor: number;
-  coordinates: [number, number];
-  type: string;
-}
-
-interface ImageMapProps {
-  selectedStart?: ExternalRoom | null;
-  selectedEnd?: ExternalRoom | null;
-  useCurrentLocation?: boolean;
-}
-
-export const ImageMap: React.FC<ImageMapProps> = ({ 
-  selectedStart, 
-  selectedEnd, 
-  useCurrentLocation = false 
-}) => {
+export const ImageMap = () => {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [paths, setPaths] = useState<Path[]>([]);
-  const [route, setRoute] = useState<Waypoint[]>([]);
-  const [directions, setDirections] = useState<string[]>([]);
-  const [zoom, setZoom] = useState(1);
-  const [currentLocation, setCurrentLocation] = useState<{ x: number; y: number } | null>(null);
-  const [isTracking, setIsTracking] = useState(false);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const { toast } = useToast();
 
   // Load navigation data on component mount
   useEffect(() => {
@@ -67,6 +43,25 @@ export const ImageMap: React.FC<ImageMapProps> = ({
     setRooms(navigationData.rooms || []);
     setPaths(navigationData.paths || []);
   }, []);
+  const [isWaypointMode, setIsWaypointMode] = useState(false);
+  const [isRoomMode, setIsRoomMode] = useState(false);
+  const [isPathMode, setIsPathMode] = useState(false);
+  const [selectedWaypointForPath, setSelectedWaypointForPath] = useState<string | null>(null);
+  const [selectedRoomForPath, setSelectedRoomForPath] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [newPointName, setNewPointName] = useState('');
+  const [selectedStart, setSelectedStart] = useState<Room | null>(null);
+  const [selectedEnd, setSelectedEnd] = useState<Room | null>(null);
+  const [route, setRoute] = useState<Waypoint[]>([]);
+  const [directions, setDirections] = useState<string[]>([]);
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+  const [editingRoomName, setEditingRoomName] = useState('');
+  const [roomSearchTerm, setRoomSearchTerm] = useState('');
+  const [showRooms, setShowRooms] = useState(true);
+  const [zoom, setZoom] = useState(1);
+  const [currentLocation, setCurrentLocation] = useState<{ x: number; y: number } | null>(null);
+  const [isTracking, setIsTracking] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   // GPS corner coordinates for the map
   const mapCorners = {
@@ -113,48 +108,158 @@ export const ImageMap: React.FC<ImageMapProps> = ({
     return pixels * feetPerPixel;
   };
 
-  // Convert external room format to internal room format
-  const convertExternalRoom = (externalRoom: ExternalRoom): Room => {
-    // Find matching room in schoolRooms by ID first
-    const schoolRoom = schoolRooms.find(r => r.id === externalRoom.id);
-    if (schoolRoom) {
-      return {
-        id: schoolRoom.id,
-        name: schoolRoom.name,
-        x: schoolRoom.coordinates[0] / 100,
-        y: schoolRoom.coordinates[1] / 100
-      };
+  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!imageRef.current) return;
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const naturalWidth = imageRef.current.naturalWidth;
+    const naturalHeight = imageRef.current.naturalHeight;
+    
+    if (naturalWidth === 0 || naturalHeight === 0) return;
+    
+    // Get click position relative to the container
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    
+    // Calculate how the image is displayed (object-contain behavior)
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
+    const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
+    const displayedWidth = naturalWidth * scale;
+    const displayedHeight = naturalHeight * scale;
+    
+    // Calculate centering offsets
+    const offsetX = (containerWidth - displayedWidth) / 2;
+    const offsetY = (containerHeight - displayedHeight) / 2;
+    
+    // Convert click coordinates to image coordinates (accounting for zoom)
+    const imageX = ((clickX - offsetX) / zoom - offsetX * (1 - zoom) / zoom) / scale;
+    const imageY = ((clickY - offsetY) / zoom - offsetY * (1 - zoom) / zoom) / scale;
+    
+    // Check if click is within the image bounds
+    if (imageX < 0 || imageX > naturalWidth || imageY < 0 || imageY > naturalHeight) {
+      return;
     }
 
-    // If not found, use coordinates as percentage
-    return {
-      id: externalRoom.id,
-      name: externalRoom.name,
-      x: externalRoom.coordinates[0] / 100,
-      y: externalRoom.coordinates[1] / 100
-    };
+    // Convert to percentage coordinates
+    const percentX = imageX / naturalWidth;
+    const percentY = imageY / naturalHeight;
+
+    if (isWaypointMode) {
+      const waypointNumber = waypoints.length + 1;
+      const waypoint: Waypoint = {
+        id: `wp-${Date.now()}`,
+        name: `WP${waypointNumber}`,
+        x: percentX,
+        y: percentY,
+        type: 'corridor'
+      };
+      setWaypoints(prev => [...prev, waypoint]);
+      toast({ title: `Waypoint ${waypointNumber} placed` });
+    } else if (isRoomMode) {
+      const roomNumber = rooms.length + 1;
+      const room: Room = {
+        id: `room-${Date.now()}`,
+        name: roomNumber.toString(),
+        x: percentX,
+        y: percentY
+      };
+      setRooms(prev => [...prev, room]);
+      toast({ title: `Room ${roomNumber} placed` });
+    }
   };
 
-  // Update route when external selections change
-  useEffect(() => {
-    if ((selectedStart || useCurrentLocation) && selectedEnd) {
-      calculateRoute();
+  const handleWaypointClick = (waypointId: string) => {
+    if (!isPathMode) return;
+    
+    if (!selectedWaypointForPath && !selectedRoomForPath) {
+      setSelectedWaypointForPath(waypointId);
+      toast({ title: "Now click another waypoint or room to create path" });
+    } else if (selectedWaypointForPath && selectedWaypointForPath !== waypointId) {
+      // Waypoint to waypoint path
+      const pathExists = paths.some(p => 
+        (p.waypointA === selectedWaypointForPath && p.waypointB === waypointId) ||
+        (p.waypointA === waypointId && p.waypointB === selectedWaypointForPath)
+      );
+      
+      if (pathExists) {
+        toast({ title: "Path already exists between these waypoints", variant: "destructive" });
+      } else {
+        const newPath: Path = {
+          id: `path-${Date.now()}`,
+          waypointA: selectedWaypointForPath,
+          waypointB: waypointId
+        };
+        setPaths(prev => [...prev, newPath]);
+        toast({ title: "Waypoint-to-waypoint path created" });
+      }
+      setSelectedWaypointForPath(null);
+    } else if (selectedRoomForPath) {
+      // Room to waypoint path
+      const pathExists = paths.some(p => 
+        (p.waypointA === waypointId && p.roomB === selectedRoomForPath)
+      );
+      
+      if (pathExists) {
+        toast({ title: "Path already exists between this waypoint and room", variant: "destructive" });
+      } else {
+        const newPath: Path = {
+          id: `path-${Date.now()}`,
+          waypointA: waypointId,
+          roomB: selectedRoomForPath
+        };
+        setPaths(prev => [...prev, newPath]);
+        toast({ title: "Waypoint-to-room path created" });
+      }
+      setSelectedRoomForPath(null);
+    } else {
+      // Cancel selection
+      setSelectedWaypointForPath(null);
+      setSelectedRoomForPath(null);
+      toast({ title: "Path creation cancelled" });
     }
-  }, [selectedStart, selectedEnd, useCurrentLocation, currentLocation]);
+  };
+
+  const handleRoomClick = (roomId: string) => {
+    if (!isPathMode) {
+      // Normal room selection for routing
+      const room = rooms.find(r => r.id === roomId);
+      if (room) selectRoom(room);
+      return;
+    }
+    
+    if (!selectedWaypointForPath && !selectedRoomForPath) {
+      setSelectedRoomForPath(roomId);
+      toast({ title: "Now click a waypoint to create path" });
+    } else if (selectedWaypointForPath) {
+      // Waypoint to room path
+      const pathExists = paths.some(p => 
+        (p.waypointA === selectedWaypointForPath && p.roomB === roomId)
+      );
+      
+      if (pathExists) {
+        toast({ title: "Path already exists between this waypoint and room", variant: "destructive" });
+      } else {
+        const newPath: Path = {
+          id: `path-${Date.now()}`,
+          waypointA: selectedWaypointForPath,
+          roomB: roomId
+        };
+        setPaths(prev => [...prev, newPath]);
+        toast({ title: "Waypoint-to-room path created" });
+      }
+      setSelectedWaypointForPath(null);
+    } else {
+      // Cancel selection
+      setSelectedWaypointForPath(null);
+      setSelectedRoomForPath(null);
+      toast({ title: "Path creation cancelled" });
+    }
+  };
 
   const calculateRoute = () => {
-    const start = useCurrentLocation && currentLocation ? 
-      { 
-        id: 'current', 
-        name: 'Current Location', 
-        x: currentLocation.x / 100, 
-        y: currentLocation.y / 100 
-      } as Room : 
-      selectedStart ? convertExternalRoom(selectedStart) : null;
-      
-    const end = selectedEnd ? convertExternalRoom(selectedEnd) : null;
-      
-    if (!start || !end) {
+    if (!selectedStart || !selectedEnd) {
+      toast({ title: "Select both start and destination", variant: "destructive" });
       return;
     }
 
@@ -170,14 +275,14 @@ export const ImageMap: React.FC<ImageMapProps> = ({
 
     // Find nearest waypoints to start and end rooms
     const startWaypoint = waypoints.reduce((nearest, wp) => {
-      const distance = Math.hypot(wp.x - start.x, wp.y - start.y);
-      const nearestDistance = Math.hypot(nearest.x - start.x, nearest.y - start.y);
+      const distance = Math.hypot(wp.x - selectedStart.x, wp.y - selectedStart.y);
+      const nearestDistance = Math.hypot(nearest.x - selectedStart.x, nearest.y - selectedStart.y);
       return distance < nearestDistance ? wp : nearest;
     });
 
     const endWaypoint = waypoints.reduce((nearest, wp) => {
-      const distance = Math.hypot(wp.x - end.x, wp.y - end.y);
-      const nearestDistance = Math.hypot(nearest.x - end.x, nearest.y - end.y);
+      const distance = Math.hypot(wp.x - selectedEnd.x, wp.y - selectedEnd.y);
+      const nearestDistance = Math.hypot(nearest.x - selectedEnd.x, nearest.y - selectedEnd.y);
       return distance < nearestDistance ? wp : nearest;
     });
 
@@ -186,14 +291,14 @@ export const ImageMap: React.FC<ImageMapProps> = ({
     let actualEndWaypoint = endWaypoint;
     
     // If start room has a direct path to a waypoint, use that waypoint
-    const startRoomPath = paths.find(p => p.roomB === start.id);
+    const startRoomPath = paths.find(p => p.roomB === selectedStart.id);
     if (startRoomPath) {
       const connectedWaypoint = waypoints.find(wp => wp.id === startRoomPath.waypointA);
       if (connectedWaypoint) actualStartWaypoint = connectedWaypoint;
     }
     
     // If end room has a direct path to a waypoint, use that waypoint
-    const endRoomPath = paths.find(p => p.roomB === end.id);
+    const endRoomPath = paths.find(p => p.roomB === selectedEnd.id);
     if (endRoomPath) {
       const connectedWaypoint = waypoints.find(wp => wp.id === endRoomPath.waypointA);
       if (connectedWaypoint) actualEndWaypoint = connectedWaypoint;
@@ -211,12 +316,12 @@ export const ImageMap: React.FC<ImageMapProps> = ({
     const routeWithStartAndDestination = [];
     
     // Add start room if it's not the same as the first waypoint
-    if (actualStartWaypoint.id !== start.id) {
+    if (actualStartWaypoint.id !== selectedStart.id) {
       const startPoint: Waypoint = {
-        id: start.id,
-        name: start.name,
-        x: start.x,
-        y: start.y,
+        id: selectedStart.id,
+        name: selectedStart.name,
+        x: selectedStart.x,
+        y: selectedStart.y,
         type: 'room'
       };
       routeWithStartAndDestination.push(startPoint);
@@ -226,12 +331,12 @@ export const ImageMap: React.FC<ImageMapProps> = ({
     routeWithStartAndDestination.push(...path);
     
     // Add destination room if it's not the same as the last waypoint
-    if (actualEndWaypoint.id !== end.id) {
+    if (actualEndWaypoint.id !== selectedEnd.id) {
       const destinationPoint: Waypoint = {
-        id: end.id,
-        name: end.name,
-        x: end.x,
-        y: end.y,
+        id: selectedEnd.id,
+        name: selectedEnd.name,
+        x: selectedEnd.x,
+        y: selectedEnd.y,
         type: 'destination'
       };
       routeWithStartAndDestination.push(destinationPoint);
@@ -243,6 +348,46 @@ export const ImageMap: React.FC<ImageMapProps> = ({
     console.log('Route calculated:', routeWithStartAndDestination);
     toast({ title: `Route found with ${routeWithStartAndDestination.length} points` });
   };
+
+  const deleteWaypoint = (id: string) => {
+    setWaypoints(prev => prev.filter(w => w.id !== id));
+    // Also remove any paths connected to this waypoint
+    setPaths(prev => prev.filter(p => p.waypointA !== id && p.waypointB !== id));
+    console.log('Waypoint deleted:', id);
+  };
+
+  const selectRoom = (room: Room) => {
+    if (!selectedStart) {
+      setSelectedStart(room);
+      toast({ title: `Start: ${room.name}` });
+    } else if (!selectedEnd && room.id !== selectedStart.id) {
+      setSelectedEnd(room);
+      toast({ title: `Destination: ${room.name}` });
+    }
+  };
+
+  const deletePath = (pathId: string) => {
+    setPaths(prev => prev.filter(p => p.id !== pathId));
+    toast({ title: "Path deleted" });
+  };
+
+  const findNearestWaypoint = (x: number, y: number): Waypoint | null => {
+    if (waypoints.length === 0) return null;
+    
+    let nearest = waypoints[0];
+    let minDistance = Math.hypot(x - nearest.x, y - nearest.y);
+    
+    for (const wp of waypoints) {
+      const distance = Math.hypot(x - wp.x, y - wp.y);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = wp;
+      }
+    }
+    
+    return nearest;
+  };
+
 
   const findOptimalPath = (start: Waypoint, end: Waypoint): Waypoint[] => {
     if (start.id === end.id) return [start];
@@ -266,6 +411,9 @@ export const ImageMap: React.FC<ImageMapProps> = ({
           graph.get(path.waypointA)!.push(waypointB);
           graph.get(path.waypointB)!.push(waypointA); // bidirectional
         }
+      } else if (path.roomB) {
+        // Waypoint to room path - we'll handle this when finding routes to rooms
+        // For now, just ensure the waypoint exists in the graph
       }
     });
     
@@ -339,8 +487,87 @@ export const ImageMap: React.FC<ImageMapProps> = ({
   };
 
   const clearRoute = () => {
+    setSelectedStart(null);
+    setSelectedEnd(null);
     setRoute([]);
     setDirections([]);
+    toast({ title: "Route cleared" });
+  };
+
+
+  const deleteRoom = (id: string) => {
+    setRooms(prev => prev.filter(room => room.id !== id));
+    if (selectedStart?.id === id) setSelectedStart(null);
+    if (selectedEnd?.id === id) setSelectedEnd(null);
+    toast({ title: "Room deleted" });
+  };
+
+  const startEditingRoom = (room: Room) => {
+    setEditingRoomId(room.id);
+    setEditingRoomName(room.name);
+  };
+
+  const saveRoomEdit = () => {
+    if (editingRoomId && editingRoomName.trim()) {
+      setRooms(prev => prev.map(room => 
+        room.id === editingRoomId 
+          ? { ...room, name: editingRoomName.trim() }
+          : room
+      ));
+      setEditingRoomId(null);
+      setEditingRoomName('');
+      toast({ title: "Room renamed" });
+    }
+  };
+
+  const cancelRoomEdit = () => {
+    setEditingRoomId(null);
+    setEditingRoomName('');
+  };
+
+  const exportData = () => {
+    const data = {
+      waypoints,
+      rooms,
+      paths,
+      version: '2.0'
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'school-navigation-data.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast({ title: `Exported ${waypoints.length} waypoints, ${rooms.length} rooms, and ${paths.length} paths` });
+  };
+
+  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        
+        if (data.waypoints) setWaypoints(data.waypoints);
+        if (data.rooms) setRooms(data.rooms);
+        if (data.paths) setPaths(data.paths || []);
+        
+        toast({ 
+          title: `Imported ${data.waypoints?.length || 0} waypoints, ${data.rooms?.length || 0} rooms, and ${data.paths?.length || 0} paths` 
+        });
+      } catch (error) {
+        toast({ title: "Failed to import data", variant: "destructive" });
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset the input
+    event.target.value = '';
   };
 
   // GPS coordinate conversion functions
@@ -361,8 +588,8 @@ export const ImageMap: React.FC<ImageMapProps> = ({
     const clampedLngFactor = Math.max(0, Math.min(1, lngFactor));
     
     return {
-      x: clampedLngFactor * 100, // longitude maps to x-axis (convert to percentage)
-      y: (1 - clampedLatFactor) * 100 // latitude maps to y-axis (inverted because image coordinates start from top)
+      x: clampedLngFactor, // longitude maps to x-axis
+      y: 1 - clampedLatFactor // latitude maps to y-axis (inverted because image coordinates start from top)
     };
   };
 
@@ -382,7 +609,17 @@ export const ImageMap: React.FC<ImageMapProps> = ({
           const percentCoords = convertGPSToPercent(lat, lng);
           setCurrentLocation(percentCoords);
           
-          toast({ title: "Location updated" });
+          // Auto-select current location as start if no start is selected
+          if (!selectedStart) {
+            const currentLocationRoom: Room = {
+              id: 'current-location',
+              name: 'Your Location',
+              x: percentCoords.x,
+              y: percentCoords.y
+            };
+            setSelectedStart(currentLocationRoom);
+            toast({ title: "Current location set as start" });
+          }
         } else {
           toast({ title: "You are outside the mapped area", variant: "destructive" });
         }
@@ -397,21 +634,53 @@ export const ImageMap: React.FC<ImageMapProps> = ({
     }
   };
 
-  // Start continuous GPS tracking if using current location
+  // Start continuous GPS tracking
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    if (useCurrentLocation) {
-      getCurrentGPSLocation(); // Get initial location
+    if (isTracking) {
       interval = setInterval(() => {
         getCurrentGPSLocation();
-      }, 5000); // Update every 5 seconds
+      }, 3000); // Update every 3 seconds
     }
     
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [useCurrentLocation]);
+  }, [isTracking]);
+
+  const zoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
+  const zoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
+
+  // Filter rooms based on search term
+  const filteredRooms = rooms.filter(room => 
+    room.name.toLowerCase().includes(roomSearchTerm.toLowerCase())
+  );
+
+  // Helper function to convert percentage coordinates to display coordinates
+  const getDisplayCoordinates = (percentX: number, percentY: number) => {
+    if (!imageRef.current) return { x: 0, y: 0 };
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const naturalWidth = imageRef.current.naturalWidth;
+    const naturalHeight = imageRef.current.naturalHeight;
+    
+    if (naturalWidth === 0 || naturalHeight === 0) return { x: 0, y: 0 };
+    
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
+    const scale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
+    const displayedWidth = naturalWidth * scale;
+    const displayedHeight = naturalHeight * scale;
+    
+    const offsetX = (containerWidth - displayedWidth) / 2;
+    const offsetY = (containerHeight - displayedHeight) / 2;
+    
+    const x = offsetX + (percentX * naturalWidth * scale);
+    const y = offsetY + (percentY * naturalHeight * scale);
+    
+    return { x, y };
+  };
 
   const calculateDirections = (routePoints: Waypoint[]): string[] => {
     if (routePoints.length < 2) return [];
@@ -445,10 +714,21 @@ export const ImageMap: React.FC<ImageMapProps> = ({
       const segmentBearing = Math.atan2(nextX - currentX, currentY - nextY) * 180 / Math.PI;
       const normalizedSegmentBearing = (segmentBearing + 360) % 360;
       
+      // Determine cardinal direction for this segment
+      let direction = '';
+      if (normalizedSegmentBearing >= 337.5 || normalizedSegmentBearing < 22.5) direction = 'north';
+      else if (normalizedSegmentBearing >= 22.5 && normalizedSegmentBearing < 67.5) direction = 'northeast';
+      else if (normalizedSegmentBearing >= 67.5 && normalizedSegmentBearing < 112.5) direction = 'east';
+      else if (normalizedSegmentBearing >= 112.5 && normalizedSegmentBearing < 157.5) direction = 'southeast';
+      else if (normalizedSegmentBearing >= 157.5 && normalizedSegmentBearing < 202.5) direction = 'south';
+      else if (normalizedSegmentBearing >= 202.5 && normalizedSegmentBearing < 247.5) direction = 'southwest';
+      else if (normalizedSegmentBearing >= 247.5 && normalizedSegmentBearing < 292.5) direction = 'west';
+      else direction = 'northwest';
+      
       if (i === 0) {
         // First step - establish initial facing direction
         currentFacingBearing = normalizedSegmentBearing;
-        directions.push(`Head forward for ${Math.round(distanceFeet)} feet`);
+        directions.push(`Start at ${current.name} and head ${direction} for ${Math.round(distanceFeet)} feet`);
       } else {
         // Calculate turn direction relative to walker's current facing direction
         const turnDirection = getWalkerTurnDirection(currentFacingBearing, normalizedSegmentBearing);
@@ -476,7 +756,7 @@ export const ImageMap: React.FC<ImageMapProps> = ({
     
     // Add total distance summary
     if (totalDistance > 0) {
-      directions.push(`Total: ${Math.round(totalDistance)} ft (${Math.round(totalDistance/4)} sec walk)`);
+      directions.push(`\nTotal distance: ${Math.round(totalDistance)} feet (approximately ${Math.round(totalDistance/4)} seconds walking)`);
     }
     
     return directions;
@@ -495,164 +775,193 @@ export const ImageMap: React.FC<ImageMapProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
-      {/* Mobile-optimized map container */}
-      <div className="flex-1 relative bg-background rounded-lg overflow-hidden border border-border"
-           style={{ minHeight: '70vh' }}>
-        <div 
-          className="w-full h-full relative overflow-hidden touch-pan-x touch-pan-y flex items-center justify-center"
-          style={{ 
-            transform: `scale(${zoom})`, 
-            transformOrigin: 'center center',
-            transition: 'transform 0.2s ease'
-          }}
-        >
-          <img
-            ref={imageRef}
-            src="/school-floorplan.jpg"
-            alt="School Floor Plan"
-            className="max-w-full max-h-full object-contain cursor-pointer select-none"
-            onLoad={() => {
-              console.log('Image loaded');
-            }}
-            draggable={false}
-          />
-
-          {/* Selected Start Room Highlight */}
+    <div className="w-full h-screen flex bg-background">
+      {/* Control Panel */}
+      <div className="w-80 p-4 border-r bg-card overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4">School Navigation</h2>
+        
+        {/* Navigation Controls */}
+        <div className="space-y-3 mb-6">
+          <h3 className="font-semibold">Navigation</h3>
           {selectedStart && (
-            <div
-              className="absolute w-6 h-6 bg-primary border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20 shadow-lg"
-              style={{
-                left: `${convertExternalRoom(selectedStart).x * 100}%`,
-                top: `${convertExternalRoom(selectedStart).y * 100}%`,
-              }}
-            >
-              <div className="absolute inset-0 bg-primary rounded-full animate-pulse opacity-75"></div>
-            </div>
+            <Badge variant="secondary">Start: {selectedStart.name}</Badge>
           )}
-
-          {/* Selected End Room Highlight */}
           {selectedEnd && (
-            <div
-              className="absolute w-6 h-6 bg-accent border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20 shadow-lg"
-              style={{
-                left: `${convertExternalRoom(selectedEnd).x * 100}%`,
-                top: `${convertExternalRoom(selectedEnd).y * 100}%`,
-              }}
-            >
-              <div className="absolute inset-0 bg-accent rounded-full animate-pulse opacity-75"></div>
-            </div>
+            <Badge variant="secondary">End: {selectedEnd.name}</Badge>
           )}
-
-          {/* Current Location Dot - Prominent pink/red dot */}
-          {currentLocation && (
-            <div
-              className="absolute w-5 h-5 bg-accent border-3 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-30 shadow-xl"
-              style={{
-                left: `${currentLocation.x}%`,
-                top: `${currentLocation.y}%`,
-              }}
-            >
-              <div className="absolute inset-0 bg-accent rounded-full animate-pulse opacity-75"></div>
-              <div className="absolute -inset-1 bg-accent rounded-full animate-ping opacity-25"></div>
-            </div>
-          )}
-
-          {/* Route Line */}
-          {route.length > 1 && (
-            <svg className="absolute inset-0 pointer-events-none w-full h-full">
-              <polyline
-                points={route.map(wp => `${wp.x * 100},${wp.y * 100}`).join(' ')}
-                fill="none"
-                stroke="hsl(var(--accent))"
-                strokeWidth="4"
-                strokeOpacity="0.9"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {/* Route direction arrows */}
-              {route.map((wp, index) => {
-                if (index === route.length - 1) return null;
-                const next = route[index + 1];
-                const midX = (wp.x + next.x) * 50; // Midpoint between waypoints
-                const midY = (wp.y + next.y) * 50;
-                const angle = Math.atan2(next.y - wp.y, next.x - wp.x) * 180 / Math.PI;
-                
-                return (
-                  <polygon
-                    key={`arrow-${index}`}
-                    points="0,-5 10,0 0,5"
-                    fill="hsl(var(--accent))"
-                    transform={`translate(${midX},${midY}) rotate(${angle})`}
-                  />
-                );
-              })}
-            </svg>
-          )}
-        </div>
-
-        {/* Simplified Zoom Controls for Mobile */}
-        <div className="absolute bottom-4 right-4 flex flex-col gap-2 bg-card/80 backdrop-blur-sm rounded-lg p-2 shadow-lg">
-          <Button
-            onClick={() => setZoom(prev => Math.min(prev + 0.3, 2.5))}
-            size="sm"
-            variant="secondary"
-            className="w-10 h-10 p-0 touch-manipulation"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button
-            onClick={() => setZoom(prev => Math.max(prev - 0.3, 0.8))}
-            size="sm"
-            variant="secondary"
-            className="w-10 h-10 p-0 touch-manipulation"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Current Location Button */}
-        {useCurrentLocation && (
-          <div className="absolute bottom-4 left-4 bg-card/80 backdrop-blur-sm rounded-lg p-2 shadow-lg">
-            <Button
-              onClick={getCurrentGPSLocation}
-              size="sm"
-              variant="secondary"
-              disabled={isTracking}
-              className="w-10 h-10 p-0 touch-manipulation"
-            >
-              <Target className={`h-4 w-4 ${isTracking ? 'animate-spin' : ''}`} />
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" onClick={calculateRoute} disabled={!selectedStart || !selectedEnd}>
+              <Navigation className="w-4 h-4 mr-1" />
+              Route
             </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Route Information - Bottom overlay for mobile */}
-      {route.length > 0 && (
-        <div className="absolute bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border p-4 max-h-48 overflow-y-auto">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold text-sm">Directions</h3>
-            <Button onClick={clearRoute} variant="ghost" size="sm" className="h-6 px-2 text-xs">
+            <Button size="sm" variant="outline" onClick={clearRoute}>
               Clear
             </Button>
-          </div>
-          <div className="space-y-1">
-            {directions.slice(0, 3).map((direction, index) => (
-              <div key={index} className="flex items-start gap-2 text-xs">
-                <Badge variant="outline" className="min-w-[20px] h-5 text-xs flex items-center justify-center shrink-0">
-                  {index + 1}
-                </Badge>
-                <span className="leading-tight">{direction}</span>
-              </div>
-            ))}
-            {directions.length > 3 && (
-              <div className="text-xs text-muted-foreground mt-1">
-                +{directions.length - 3} more steps
-              </div>
-            )}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={getCurrentGPSLocation}
+              disabled={isTracking}
+              className="text-xs"
+            >
+              <MapPin className="w-4 h-4 mr-1" />
+              {isTracking ? 'Locating...' : 'My Location'}
+            </Button>
           </div>
         </div>
-      )}
+
+        {/* Turn-by-Turn Directions */}
+        {directions.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-semibold mb-2">Directions</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {directions.map((direction, index) => (
+                <div key={index} className="flex items-start gap-2 p-2 bg-muted rounded text-sm">
+                  <Badge variant="outline" className="min-w-6 h-6 flex items-center justify-center text-xs">
+                    {index + 1}
+                  </Badge>
+                  <span className="text-sm leading-relaxed">{direction}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Room Search and List */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold">Rooms ({rooms.length})</h3>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowRooms(!showRooms)}
+              className="h-7 w-7 p-0"
+            >
+              {showRooms ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            </Button>
+          </div>
+          
+          {/* Room Search */}
+          <div className="relative mb-3">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search rooms..."
+              value={roomSearchTerm}
+              onChange={(e) => setRoomSearchTerm(e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
+          
+          <div className="space-y-1 max-h-96 overflow-y-auto">
+            {filteredRooms.map(room => (
+              <div key={room.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
+                <span 
+                  className="cursor-pointer hover:text-primary flex-1"
+                  onClick={() => selectRoom(room)}
+                >
+                  {room.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Floor Plan */}
+      <div className="flex-1 relative overflow-hidden">
+        <div className="relative w-full h-full flex items-center justify-center overflow-auto">
+            <img 
+              ref={imageRef}
+              src="/school-floorplan.jpg" 
+              alt="School Floor Plan"
+              className="w-full h-full object-contain transition-transform duration-200"
+              draggable={false}
+              style={{ 
+                transform: `scale(${zoom})`,
+                transformOrigin: 'center center',
+                minWidth: '100%',
+                minHeight: '100%'
+              }}
+            />
+            {/* Current Location (Pink Dot) */}
+            {currentLocation && (
+              <div
+                className="absolute w-4 h-4 bg-pink-500 border-2 border-white rounded-full shadow-lg animate-pulse"
+                style={{ 
+                  left: getDisplayCoordinates(currentLocation.x, currentLocation.y).x - 8, 
+                  top: getDisplayCoordinates(currentLocation.x, currentLocation.y).y - 8 
+                }}
+                title="Your Current Location"
+              />
+            )}
+
+            {/* Rooms */}
+            {showRooms && rooms.map(room => {
+              const { x, y } = getDisplayCoordinates(room.x, room.y);
+              
+              return (
+                <div
+                  key={room.id}
+                  className={`absolute w-3 h-3 border border-white rounded-sm shadow-sm cursor-pointer transition-all duration-200 hover:scale-150 ${
+                    selectedStart?.id === room.id ? 'bg-primary' :
+                    selectedEnd?.id === room.id ? 'bg-accent' : 'bg-primary/80'
+                  }`}
+                  style={{ left: x - 6, top: y - 6 }}
+                  onClick={() => selectRoom(room)}
+                  title={room.name}
+                />
+              );
+            })}
+            
+            {/* Route Line */}
+            {route.length > 1 && (
+              <svg className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
+                <polyline
+                  points={route.map(wp => {
+                    const { x, y } = getDisplayCoordinates(wp.x, wp.y);
+                    return `${x},${y}`;
+                  }).join(' ')}
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth="3"
+                  strokeOpacity="0.9"
+                />
+              </svg>
+            )}
+          </div>
+        
+        {/* Zoom Controls */}
+        <div className="absolute top-4 right-4 flex flex-col gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={zoomIn}
+            className="w-10 h-10 p-0 bg-background/95"
+            disabled={zoom >= 3}
+          >
+            <ZoomIn className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={zoomOut}
+            className="w-10 h-10 p-0 bg-background/95"
+            disabled={zoom <= 0.5}
+          >
+            <ZoomOut className="w-4 h-4" />
+          </Button>
+          <div className="text-xs text-center text-muted-foreground bg-background/95 px-2 py-1 rounded">
+            {Math.round(zoom * 100)}%
+          </div>
+        </div>
+
+        {/* Instructions */}
+        <div className="absolute top-4 left-4 bg-card/95 backdrop-blur-sm p-3 rounded-lg border border-primary/20 shadow-[--shadow-card]">
+          <p className="text-sm font-medium text-foreground">
+            Click rooms to select start and destination for navigation
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

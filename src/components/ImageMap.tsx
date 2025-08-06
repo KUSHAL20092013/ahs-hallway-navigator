@@ -497,10 +497,10 @@ export const ImageMap: React.FC<ImageMapProps> = ({
   return (
     <div className="w-full h-full flex flex-col">
       {/* Mobile-optimized map container */}
-      <div className="flex-1 relative bg-muted rounded-lg overflow-hidden"
-           style={{ minHeight: '60vh' }}>
+      <div className="flex-1 relative bg-background rounded-lg overflow-hidden border border-border"
+           style={{ minHeight: '70vh' }}>
         <div 
-          className="w-full h-full relative overflow-hidden touch-pan-x touch-pan-y"
+          className="w-full h-full relative overflow-hidden touch-pan-x touch-pan-y flex items-center justify-center"
           style={{ 
             transform: `scale(${zoom})`, 
             transformOrigin: 'center center',
@@ -511,7 +511,7 @@ export const ImageMap: React.FC<ImageMapProps> = ({
             ref={imageRef}
             src="/school-floorplan.jpg"
             alt="School Floor Plan"
-            className="w-full h-full object-cover cursor-pointer select-none"
+            className="max-w-full max-h-full object-contain cursor-pointer select-none"
             onLoad={() => {
               console.log('Image loaded');
             }}

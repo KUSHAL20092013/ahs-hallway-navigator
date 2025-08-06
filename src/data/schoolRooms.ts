@@ -1,5 +1,12 @@
 
-import { Room } from '@/hooks/useSchoolNavigation';
+export interface Room {
+  id: string;
+  name: string;
+  building: string;
+  floor: number;
+  coordinates: [number, number];
+  type: 'classroom' | 'lab' | 'facility' | 'office';
+}
 
 export const schoolRooms: Room[] = [
   // Building 1 Level 1 - Classrooms

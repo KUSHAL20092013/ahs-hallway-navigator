@@ -1,3 +1,4 @@
+//only sidebar side bar
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +30,7 @@ import {
 } from 'lucide-react';
 
 export function FloorPlanSidebar() {
+  //all paths, waypoints, rooms are default set to false which means that they are not initially seen
   const [showPaths, setShowPaths] = useState(false);
   const [showWaypoints, setShowWaypoints] = useState(true);
   const [showRooms, setShowRooms] = useState(true);
@@ -38,7 +40,7 @@ export function FloorPlanSidebar() {
   const pathCount = 0;
   const waypointCount = 0;
   const roomCount = 0;
-
+  //below is just syling of sidebar
   return (
     <Sidebar className="border-r border-border/50">
       <SidebarHeader className="p-6 border-b border-border/50">
@@ -86,7 +88,7 @@ export function FloorPlanSidebar() {
                 <SidebarMenuButton 
                   variant={showPaths ? "default" : "outline"}
                   className="justify-start h-12"
-                  onClick={() => setShowPaths(!showPaths)}
+                  onClick={() => setShowPaths(!showPaths)} //when show paths is clicked, it will show the possible path
                 >
                   <Eye className="h-5 w-5" />
                   <span>Show Paths</span>
@@ -187,7 +189,7 @@ export function FloorPlanSidebar() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowWaypoints(!showWaypoints)}
+              onClick={() => setShowWaypoints(!showWaypoints)} // show/hide waypoint button 
               className="h-8 w-8 p-0"
             >
               {showWaypoints ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -217,7 +219,7 @@ export function FloorPlanSidebar() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowRooms(!showRooms)}
+              onClick={() => setShowRooms(!showRooms)} // this is the show rooms/don't show rooms button
               className="h-8 w-8 p-0"
             >
               {showRooms ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -229,7 +231,7 @@ export function FloorPlanSidebar() {
               <Input
                 placeholder="Search rooms..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}// basically means that if the user stars writing '1' for room number 101, the search query will offer a lot of options with the character 1 in it. 
                 className="pl-10 h-10 border-border/50"
               />
             </div>

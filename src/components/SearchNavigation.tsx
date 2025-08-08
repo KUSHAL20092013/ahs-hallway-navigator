@@ -63,7 +63,7 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
   const selectStart = (selection: Room | 'current') => {
     setSelectedStart(selection);
     setStartInput(selection === 'current' ? 'Current Location' : selection.name);
-    setShowStartSuggestions(false);
+    setShowStartSuggestions(true);
   };
 
   const selectEnd = (room: Room) => {

@@ -857,14 +857,17 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
           </Button>
         </div>
 
-        {/* Mobile Directions Overlay */}
+        {/* Mobile Directions Panel - Fixed at bottom */}
         {directions.length > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border p-4 max-h-48 overflow-y-auto">
-            <h3 className="font-semibold mb-2 text-primary">Navigation Directions</h3>
-            <div className="space-y-2">
+          <div className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border p-3 max-h-40 overflow-y-auto z-50 shadow-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-primary text-sm">Directions</h3>
+              <Badge variant="outline" className="text-xs">{directions.length} steps</Badge>
+            </div>
+            <div className="space-y-1.5">
               {directions.map((direction, index) => (
-                <div key={index} className="flex items-start gap-2 text-sm">
-                  <Badge variant="default" className="min-w-6 h-6 flex items-center justify-center text-xs bg-primary text-primary-foreground">
+                <div key={index} className="flex items-start gap-2 text-xs">
+                  <Badge variant="default" className="min-w-5 h-5 flex items-center justify-center text-xs bg-primary text-primary-foreground shrink-0">
                     {index + 1}
                   </Badge>
                   <span className="leading-relaxed">{direction}</span>

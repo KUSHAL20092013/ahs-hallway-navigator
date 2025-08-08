@@ -1,8 +1,15 @@
-
 import { useState } from "react";
 import { ImageMap } from "@/components/ImageMap";
 import { SearchNavigation } from "@/components/SearchNavigation";
-import { schoolRooms, type Room } from "@/data/schoolRooms";
+import navigationData from '@/data/navigationData.json';
+
+// Define Room interface based on navigationData.json structure  
+interface Room {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+}
 
 const Index = () => {
   const [selectedStart, setSelectedStart] = useState<Room | 'current' | null>(null);

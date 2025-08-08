@@ -34,22 +34,12 @@ interface Path {
 }
 
 interface ImageMapProps {
-  selectedStart?: ExternalRoom | null;
-  selectedEnd?: ExternalRoom | null;
+  selectedStart?: Room | null;
+  selectedEnd?: Room | null;
   useCurrentLocation?: boolean;
 }
 
-export const ImageMap = ({ selectedStart: propSelectedStart, selectedEnd: propSelectedEnd, useCurrentLocation = false }: ImageMapProps) => {
-  // Convert external room data to internal format
-  const convertExternalToInternalRoom = (externalRoom: ExternalRoom): Room => ({
-    id: externalRoom.id,
-    name: externalRoom.name,
-    x: externalRoom.coordinates[0] / 100, // Convert to percentage
-    y: externalRoom.coordinates[1] / 100  // Convert to percentage
-  });
-
-  const selectedStart = propSelectedStart ? convertExternalToInternalRoom(propSelectedStart) : null;
-  const selectedEnd = propSelectedEnd ? convertExternalToInternalRoom(propSelectedEnd) : null;
+export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = false }: ImageMapProps) => {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [paths, setPaths] = useState<Path[]>([]);

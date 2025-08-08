@@ -1,8 +1,16 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { schoolRooms, type Room } from '@/data/schoolRooms';
+import navigationData from '@/data/navigationData.json';
 import { MapPin, Navigation, RotateCcw, Search } from 'lucide-react';
+
+// Define Room interface based on navigationData.json structure
+interface Room {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+}
 
 interface SearchNavigationProps {
   onRouteCalculate: (start: Room | 'current', end: Room) => void;
@@ -10,6 +18,8 @@ interface SearchNavigationProps {
 }
 
 export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigationProps) {
+  // Get rooms from navigationData.json
+  const rooms = navigationData.rooms || [];
   const [startInput, setStartInput] = useState('');
   const [endInput, setEndInput] = useState('');
   const [startSuggestions, setStartSuggestions] = useState<Room[]>([]);
@@ -22,7 +32,7 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
   const handleStartSearch = (value: string) => {
     setStartInput(value);
     if (value.length > 0) {
-      const filtered = schoolRooms.filter(room => 
+      const filtered = rooms.filter(room => 
         room.name.toLowerCase().includes(value.toLowerCase()) ||
         room.id.toLowerCase().includes(value.toLowerCase())
       );
@@ -37,7 +47,7 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
   const handleEndSearch = (value: string) => {
     setEndInput(value);
     if (value.length > 0) {
-      const filtered = schoolRooms.filter(room => 
+      const filtered = rooms.filter(room => 
         room.name.toLowerCase().includes(value.toLowerCase()) ||
         room.id.toLowerCase().includes(value.toLowerCase())
       );

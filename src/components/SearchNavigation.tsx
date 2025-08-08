@@ -31,6 +31,7 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
 
   const handleStartSearch = (value: string) => {
     setStartInput(value);
+    //basically filters your search based on the character you are typing
     if (value.length > 0) {
       const filtered = rooms.filter(room => 
         room.name.toLowerCase().includes(value.toLowerCase()) ||
@@ -40,7 +41,7 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
       setShowStartSuggestions(true);
     } else {
       setStartSuggestions([]);
-      setShowStartSuggestions(false);
+      setShowStartSuggestions(true); //originally false
     }
   };
 
@@ -55,7 +56,7 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
       setShowEndSuggestions(true);
     } else {
       setEndSuggestions([]);
-      setShowEndSuggestions(false);
+      setShowEndSuggestions(true); //originally false
     }
   };
 

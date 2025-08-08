@@ -1,27 +1,41 @@
 
 import { useState } from "react";
 import { ImageMap } from "@/components/ImageMap";
-import { PositioningStatus } from "@/components/PositioningStatus";
+import { SearchNavigation } from "@/components/SearchNavigation";
+import { schoolRooms, type Room } from "@/data/schoolRooms";
 
 const Index = () => {
-  return (
-    <div className="min-h-screen w-full bg-gradient-subtle flex flex-col">
-      {/* Position Status at the top */}
-      <div className="bg-card border-b border-border">
-        <div className="flex items-center gap-3 px-4 py-2">
-          <div className="flex-1">
-            <PositioningStatus />
-          </div>
-        </div>
-      </div>
+  const [selectedStart, setSelectedStart] = useState<Room | 'current' | null>(null);
+  const [selectedEnd, setSelectedEnd] = useState<Room | null>(null);
+  const [useCurrentLocation, setUseCurrentLocation] = useState(false);
 
-      {/* Map */}
-      <main className="flex-1 p-4">
-        <div className="w-full h-full">
-          <div className="card-mobile animate-fade-in h-full">
-            <ImageMap />
-          </div>
-        </div>
+  const handleRouteCalculate = (start: Room | 'current', end: Room) => {
+    setSelectedStart(start);
+    setSelectedEnd(end);
+    setUseCurrentLocation(start === 'current');
+  };
+
+  const handleClear = () => {
+    setSelectedStart(null);
+    setSelectedEnd(null);
+    setUseCurrentLocation(false);
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-background flex flex-col">
+      {/* Search Navigation at the top */}
+      <SearchNavigation 
+        onRouteCalculate={handleRouteCalculate}
+        onClear={handleClear}
+      />
+
+      {/* Map - Full screen below search */}
+      <main className="flex-1">
+        <ImageMap 
+          selectedStart={selectedStart === 'current' ? null : selectedStart}
+          selectedEnd={selectedEnd}
+          useCurrentLocation={useCurrentLocation}
+        />
       </main>
     </div>
   );

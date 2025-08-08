@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import navigationData from '@/data/navigationData.json';
 import { gpsPositioning } from '@/services/gpsPositioning';
 import type { WiFiPositionResult } from '@/types/wifi';
+import { schoolRooms, type Room as ExternalRoom } from '@/data/schoolRooms';
 
 interface Waypoint {
   id: string;
@@ -32,7 +33,23 @@ interface Path {
   roomB?: string; // room ID (optional for waypoint-to-room paths)
 }
 
-export const ImageMap = () => {
+interface ImageMapProps {
+  selectedStart?: ExternalRoom | null;
+  selectedEnd?: ExternalRoom | null;
+  useCurrentLocation?: boolean;
+}
+
+export const ImageMap = ({ selectedStart: propSelectedStart, selectedEnd: propSelectedEnd, useCurrentLocation = false }: ImageMapProps) => {
+  // Convert external room data to internal format
+  const convertExternalToInternalRoom = (externalRoom: ExternalRoom): Room => ({
+    id: externalRoom.id,
+    name: externalRoom.name,
+    x: externalRoom.coordinates[0] / 100, // Convert to percentage
+    y: externalRoom.coordinates[1] / 100  // Convert to percentage
+  });
+
+  const selectedStart = propSelectedStart ? convertExternalToInternalRoom(propSelectedStart) : null;
+  const selectedEnd = propSelectedEnd ? convertExternalToInternalRoom(propSelectedEnd) : null;
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [paths, setPaths] = useState<Path[]>([]);
@@ -50,8 +67,6 @@ export const ImageMap = () => {
   const [selectedRoomForPath, setSelectedRoomForPath] = useState<string | null>(null);
   const { toast } = useToast();
   const [newPointName, setNewPointName] = useState('');
-  const [selectedStart, setSelectedStart] = useState<Room | null>(null);
-  const [selectedEnd, setSelectedEnd] = useState<Room | null>(null);
   const [route, setRoute] = useState<Waypoint[]>([]);
   const [directions, setDirections] = useState<string[]>([]);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
@@ -357,13 +372,8 @@ export const ImageMap = () => {
   };
 
   const selectRoom = (room: Room) => {
-    if (!selectedStart) {
-      setSelectedStart(room);
-      toast({ title: `Start: ${room.name}` });
-    } else if (!selectedEnd && room.id !== selectedStart.id) {
-      setSelectedEnd(room);
-      toast({ title: `Destination: ${room.name}` });
-    }
+    // Room selection is now handled by parent component
+    console.log('Room selected:', room);
   };
 
   const deletePath = (pathId: string) => {
@@ -487,8 +497,6 @@ export const ImageMap = () => {
   };
 
   const clearRoute = () => {
-    setSelectedStart(null);
-    setSelectedEnd(null);
     setRoute([]);
     setDirections([]);
     toast({ title: "Route cleared" });
@@ -497,8 +505,7 @@ export const ImageMap = () => {
 
   const deleteRoom = (id: string) => {
     setRooms(prev => prev.filter(room => room.id !== id));
-    if (selectedStart?.id === id) setSelectedStart(null);
-    if (selectedEnd?.id === id) setSelectedEnd(null);
+    // Room selection is now handled by parent component
     toast({ title: "Room deleted" });
   };
 
@@ -609,17 +616,8 @@ export const ImageMap = () => {
           const percentCoords = convertGPSToPercent(lat, lng);
           setCurrentLocation(percentCoords);
           
-          // Auto-select current location as start if no start is selected
-          if (!selectedStart) {
-            const currentLocationRoom: Room = {
-              id: 'current-location',
-              name: 'Your Location',
-              x: percentCoords.x,
-              y: percentCoords.y
-            };
-            setSelectedStart(currentLocationRoom);
-            toast({ title: "Current location set as start" });
-          }
+          // Current location tracking is handled by parent component
+          toast({ title: "Current location found" });
         } else {
           toast({ title: "You are outside the mapped area", variant: "destructive" });
         }
@@ -774,101 +772,18 @@ export const ImageMap = () => {
     return diff > 0 ? 'right' : 'left'; // Positive diff = turn right, negative = turn left
   };
 
+  // Calculate route when props change
+  useEffect(() => {
+    if (selectedStart && selectedEnd) {
+      calculateRoute();
+    }
+  }, [selectedStart, selectedEnd]);
+
   return (
-    <div className="w-full h-screen flex bg-background">
-      {/* Control Panel */}
-      <div className="w-80 p-4 border-r bg-card overflow-y-auto">
-        <h2 className="text-xl font-bold mb-4">School Navigation</h2>
-        
-        {/* Navigation Controls */}
-        <div className="space-y-3 mb-6">
-          <h3 className="font-semibold">Navigation</h3>
-          {selectedStart && (
-            <Badge variant="secondary">Start: {selectedStart.name}</Badge>
-          )}
-          {selectedEnd && (
-            <Badge variant="secondary">End: {selectedEnd.name}</Badge>
-          )}
-          <div className="flex gap-2 flex-wrap">
-            <Button size="sm" onClick={calculateRoute} disabled={!selectedStart || !selectedEnd}>
-              <Navigation className="w-4 h-4 mr-1" />
-              Route
-            </Button>
-            <Button size="sm" variant="outline" onClick={clearRoute}>
-              Clear
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={getCurrentGPSLocation}
-              disabled={isTracking}
-              className="text-xs"
-            >
-              <MapPin className="w-4 h-4 mr-1" />
-              {isTracking ? 'Locating...' : 'My Location'}
-            </Button>
-          </div>
-        </div>
+    <div className="w-full h-full bg-background relative">{/* Mobile-optimized map container */}
 
-        {/* Turn-by-Turn Directions */}
-        {directions.length > 0 && (
-          <div className="mb-6">
-            <h3 className="font-semibold mb-2">Directions</h3>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {directions.map((direction, index) => (
-                <div key={index} className="flex items-start gap-2 p-2 bg-muted rounded text-sm">
-                  <Badge variant="outline" className="min-w-6 h-6 flex items-center justify-center text-xs">
-                    {index + 1}
-                  </Badge>
-                  <span className="text-sm leading-relaxed">{direction}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Room Search and List */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold">Rooms ({rooms.length})</h3>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowRooms(!showRooms)}
-              className="h-7 w-7 p-0"
-            >
-              {showRooms ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-            </Button>
-          </div>
-          
-          {/* Room Search */}
-          <div className="relative mb-3">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search rooms..."
-              value={roomSearchTerm}
-              onChange={(e) => setRoomSearchTerm(e.target.value)}
-              className="pl-8 h-8 text-sm"
-            />
-          </div>
-          
-          <div className="space-y-1 max-h-96 overflow-y-auto">
-            {filteredRooms.map(room => (
-              <div key={room.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
-                <span 
-                  className="cursor-pointer hover:text-primary flex-1"
-                  onClick={() => selectRoom(room)}
-                >
-                  {room.name}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Floor Plan */}
-      <div className="flex-1 relative overflow-hidden">
+      {/* Full Screen Floor Plan */}
+      <div className="w-full h-full relative overflow-hidden">
         <div className="relative w-full h-full flex items-center justify-center overflow-auto">
             <img 
               ref={imageRef}
@@ -930,37 +845,44 @@ export const ImageMap = () => {
             )}
           </div>
         
-        {/* Zoom Controls */}
-        <div className="absolute top-4 right-4 flex flex-col gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={zoomIn}
-            className="w-10 h-10 p-0 bg-background/95"
-            disabled={zoom >= 3}
-          >
-            <ZoomIn className="w-4 h-4" />
-          </Button>
+        {/* Mobile Zoom Controls */}
+        <div className="absolute bottom-4 right-4 flex gap-2">
           <Button
             size="sm"
             variant="outline"
             onClick={zoomOut}
-            className="w-10 h-10 p-0 bg-background/95"
+            className="w-12 h-12 p-0 bg-primary/90 text-primary-foreground border-primary"
             disabled={zoom <= 0.5}
           >
-            <ZoomOut className="w-4 h-4" />
+            <ZoomOut className="w-5 h-5" />
           </Button>
-          <div className="text-xs text-center text-muted-foreground bg-background/95 px-2 py-1 rounded">
-            {Math.round(zoom * 100)}%
-          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={zoomIn}
+            className="w-12 h-12 p-0 bg-primary/90 text-primary-foreground border-primary"
+            disabled={zoom >= 3}
+          >
+            <ZoomIn className="w-5 h-5" />
+          </Button>
         </div>
 
-        {/* Instructions */}
-        <div className="absolute top-4 left-4 bg-card/95 backdrop-blur-sm p-3 rounded-lg border border-primary/20 shadow-[--shadow-card]">
-          <p className="text-sm font-medium text-foreground">
-            Click rooms to select start and destination for navigation
-          </p>
-        </div>
+        {/* Mobile Directions Overlay */}
+        {directions.length > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border p-4 max-h-48 overflow-y-auto">
+            <h3 className="font-semibold mb-2 text-primary">Navigation Directions</h3>
+            <div className="space-y-2">
+              {directions.map((direction, index) => (
+                <div key={index} className="flex items-start gap-2 text-sm">
+                  <Badge variant="default" className="min-w-6 h-6 flex items-center justify-center text-xs bg-primary text-primary-foreground">
+                    {index + 1}
+                  </Badge>
+                  <span className="leading-relaxed">{direction}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

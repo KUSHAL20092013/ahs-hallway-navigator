@@ -1,6 +1,8 @@
 // if you are not using a json file for your project, you can write coordinates in a typescript file which is more complex. 
 import { Room } from '@/hooks/useSchoolNavigation';
 
+export type { Room };
+
 export const schoolRooms: Room[] = [
   // Building 1 Level 1 - Classrooms
   { id: '101', name: 'Room 101', building: 'Building 1', floor: 1, coordinates: [25, 45], type: 'classroom' },

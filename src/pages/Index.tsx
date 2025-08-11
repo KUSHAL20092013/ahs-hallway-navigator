@@ -10,7 +10,7 @@ interface Room {
   x: number;
   y: number;
 }
-
+//initializing starting, end point, and navigation
 const Index = () => {
   const [selectedStart, setSelectedStart] = useState<Room | 'current' | null>(null);
   const [selectedEnd, setSelectedEnd] = useState<Room | null>(null);
@@ -27,7 +27,7 @@ const Index = () => {
     setSelectedEnd(null);
     setUseCurrentLocation(false);
   };
-
+//more styling
   return (
     <div className="min-h-screen w-full bg-background flex flex-col">
       {/* Search Navigation at the top */}

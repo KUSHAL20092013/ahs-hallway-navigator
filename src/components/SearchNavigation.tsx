@@ -31,7 +31,6 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
 
   const handleStartSearch = (value: string) => {
     setStartInput(value);
-    //basically filters your search based on the character you are typing
     if (value.length > 0) {
       const filtered = rooms.filter(room => 
         room.name.toLowerCase().includes(value.toLowerCase()) ||
@@ -41,7 +40,7 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
       setShowStartSuggestions(true);
     } else {
       setStartSuggestions([]);
-      setShowStartSuggestions(true); //originally false
+      setShowStartSuggestions(false);
     }
   };
 
@@ -56,14 +55,14 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
       setShowEndSuggestions(true);
     } else {
       setEndSuggestions([]);
-      setShowEndSuggestions(true); //originally false
+      setShowEndSuggestions(false);
     }
   };
 
   const selectStart = (selection: Room | 'current') => {
     setSelectedStart(selection);
     setStartInput(selection === 'current' ? 'Current Location' : selection.name);
-    setShowStartSuggestions(true);
+    setShowStartSuggestions(false);
   };
 
   const selectEnd = (room: Room) => {

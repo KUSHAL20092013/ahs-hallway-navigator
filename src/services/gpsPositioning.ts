@@ -5,6 +5,7 @@ import type { WiFiPositionResult } from '@/types/wifi';
 export class GPSPositioningService {
   private lastKnownPosition: WiFiPositionResult | null = null;
 
+  //Checks for geolocation permission
   async isGPSAvailable(): Promise<boolean> {
     try {
       const permissions = await Geolocation.checkPermissions();
@@ -30,6 +31,7 @@ export class GPSPositioningService {
       }
     }
 
+    //trying to find geolocation of user. 
     try {
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
@@ -37,12 +39,14 @@ export class GPSPositioningService {
         maximumAge: 30000
       });
 
+      //finds current latitude and longitude
       const result: WiFiPositionResult = {
         coordinates: [position.coords.longitude, position.coords.latitude],
         accuracy: Math.min(position.coords.accuracy || 100, 100) / 100, // Normalize to 0-1
         method: 'gps'
       };
 
+      //fail case
       this.lastKnownPosition = result;
       return result;
     } catch (error) {

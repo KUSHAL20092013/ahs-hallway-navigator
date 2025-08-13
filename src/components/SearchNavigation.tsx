@@ -87,7 +87,7 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
     onClear();
   };
 
-  const showCurrentLocationOption = startInput.toLowerCase().includes('current') || startInput.toLowerCase().includes('location');
+  const showCurrentLocationOption = startInput.toLowerCase().includes('current') || startInput.toLowerCase().includes('location') || startInput === '';
 
   return (
     <div className="bg-card border-b border-border/50 p-4 space-y-3">
@@ -102,7 +102,7 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
             className="pl-10 h-12 text-base border-border/50"
           />
         </div>
-        {showStartSuggestions && (startSuggestions.length > 0 || showCurrentLocationOption) && (
+        {(showStartSuggestions || (startInput === '' && !selectedStart)) && (startSuggestions.length > 0 || showCurrentLocationOption) && (
           <div className="absolute top-full left-0 right-0 bg-card border border-border/50 rounded-md mt-1 max-h-40 overflow-y-auto z-50 shadow-lg">
             {showCurrentLocationOption && (
               <button

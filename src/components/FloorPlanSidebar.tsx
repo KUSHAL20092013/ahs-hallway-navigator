@@ -1,3 +1,4 @@
+// this is basically a setup code for when I was making the waypoints for the map as well as for room numbers and paths. 
 // //only sidebar side bar
 // import { useState } from 'react';
 // import { Button } from '@/components/ui/button';

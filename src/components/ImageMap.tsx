@@ -1,3 +1,7 @@
+// Summary: We initialize everything on the map such as the waypoints, rooms, paths, and the image itself. This includes adding the x and y coordinates to the json file called
+// navigationData.json. Constructing the path also happens here. Current location code is here too so it asks user for permission, then maps the geolocation coordinates to the
+// image pixel coordinates to create a box area of coordinates. by comparing the scale value of the image coordinates and the geopositioning coordinates, the function
+// estimates how far the user has to walk. 
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -148,7 +152,7 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
   const findOptimalPath = (start: Waypoint, end: Waypoint): Waypoint[] => {
     if (start.id === end.id) return [start];
     
-    // Build graph
+    // Build graph based on where each waypoint is and wherre each room is
     const graph = new Map<string, Waypoint[]>();
     waypoints.forEach(wp => graph.set(wp.id, []));
     
@@ -163,13 +167,13 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
       }
     });
     
-    // Simple BFS pathfinding
+    // Simple breadth-first-search (BFS) pathfinding algorithm is executed to find the closest path between two points using the waypoints given. 
     const queue = [start];
     const visited = new Set([start.id]);
     const parent = new Map<string, Waypoint>();
     
     while (queue.length > 0) {
-      const current = queue.shift()!;
+      const current = queue.shift()!; // here current means the current room we are starting from. 
       
       if (current.id === end.id) {
         // Reconstruct path
@@ -183,7 +187,7 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
         return path;
       }
       
-      const neighbors = graph.get(current.id) || [];
+      const neighbors = graph.get(current.id) || []; // here neighbor is all the surrounding waypoints or nodes in a radius. 
       for (const neighbor of neighbors) {
         if (!visited.has(neighbor.id)) {
           visited.add(neighbor.id);
@@ -196,6 +200,7 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
     return [];
   };
 
+  //function to calculate directions, including finding the distance from one place to another. 
   const calculateDirections = (route: Waypoint[]): string[] => {
     const directions = [];
     

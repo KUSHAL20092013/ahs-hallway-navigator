@@ -215,14 +215,14 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
       const dx = next.x - current.x;
       const dy = next.y - current.y;
       const distance = Math.sqrt(dx * dx + dy * dy) * 100; // Approximate distance
-      
+      // defining what exactly the cardinal directions are
       let direction = '';
       if (Math.abs(dx) > Math.abs(dy)) {
         direction = dx > 0 ? 'east' : 'west';
       } else {
         direction = dy > 0 ? 'south' : 'north';
       }
-      
+      //directions outline / template
       directions.push(`Go ${direction} to ${next.name} (${Math.round(distance)}m)`);
     }
     

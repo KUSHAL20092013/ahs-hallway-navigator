@@ -1,3 +1,4 @@
+// This is the class which filters rooms based on what the user first types. It also includes the initial current location option which users see when they first load the app. 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

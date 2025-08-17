@@ -1,8 +1,7 @@
 # Welcome to The AHS Hallway Navigator
 ## Project info
 
-**URL**: https://lovable.dev/projects/d65b62ef-dda5-4f6f-96c4-def3129d334e
-
+**URL**: 
 ## How can I edit this code?
 
 There are several ways of editing your application.
@@ -38,3 +37,6 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+
+## Building Process
+This project is completely built using The AI Software, Loveable. Howerver, I have added a lot of comments throughout the code to give everyone an understanding on what to do if they were to replicate this project for their school or organization. 

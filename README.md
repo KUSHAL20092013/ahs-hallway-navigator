@@ -39,7 +39,7 @@ This project is built with:
 - Tailwind CSS
 
 ## Building Process
-This project is completely built using The AI Software, Loveable. Howerver, I have added a lot of comments throughout the code to give everyone an understanding on what to do if they were to replicate this project for their school or organization. 
+
 
 ## Key Features
 ### Core Navigation Features

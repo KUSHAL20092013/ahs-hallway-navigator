@@ -42,7 +42,7 @@ This project is built with:
 This project is completely built using The AI Software, Loveable. Howerver, I have added a lot of comments throughout the code to give everyone an understanding on what to do if they were to replicate this project for their school or organization. 
 
 ## Key Features
-# Core Navigation Features
+### Core Navigation Features
 - Room Search: Search and select any room in the school from a comprehensive database
 - Route Calculation: Calculate optimal paths between any two rooms
 - Current Location: Use your device's location as a starting point for navigation

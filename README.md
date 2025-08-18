@@ -51,3 +51,8 @@ This project is completely built using The AI Software, Loveable. Howerver, I ha
 - Mobile-First Design: Optimized for smartphones and tablets
 - Responsive Layout: Works seamlessly across different screen sizes
 - Offline Capable: Core functionality works without internet connection
+
+## Main Files + Description
+1. ImageMap.tsx - This is where yhr majority of the logic happens. We initialize everything on the map such as the waypoints, rooms, paths, and the image itself. This includes adding the x and y coordinates to the json file called navigationData.json. Constructing the path also happens here. Current location code is here too so it asks user for permission, then maps the geolocation coordinates to the image pixel coordinates to create a box area of coordinates. by comparing the scale value of the image coordinates and the geopositioning coordinates, the function estimates how far the user has to walk.
+   
+2. SearchNavigation.tsx - This is the class which filters rooms based on what the user first types. It also includes the initial current location option which users see when they first load the app.

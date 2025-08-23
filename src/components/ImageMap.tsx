@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Navigation, ZoomIn, ZoomOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useHybridPositioning } from '@/hooks/useHybridPositioning';
+import { gpsPositioning } from '@/services/gpsPositioning';
 import navigationData from '@/data/navigationData.json';
 
 interface Waypoint {
@@ -46,7 +48,9 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
   const [directions, setDirections] = useState<string[]>([]);
   const [zoom, setZoom] = useState(1);
   const [currentLocation, setCurrentLocation] = useState<{ x: number; y: number } | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   const { toast } = useToast();
+  const { scanPosition, currentPosition, config } = useHybridPositioning();
   const imageRef = useRef<HTMLImageElement>(null);
 
   // Load navigation data on mount
@@ -66,23 +70,113 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
     }
   }, [selectedStart, selectedEnd, useCurrentLocation, waypoints, paths, currentLocation]);
 
-  // Get current location
+  // Get current location using hybrid positioning
   useEffect(() => {
-    if (useCurrentLocation && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          // Convert GPS to map coordinates (simplified)
-          const x = 0.5; // Default center position
-          const y = 0.5;
-          setCurrentLocation({ x, y });
-        },
-        () => {
-          // Fallback to center of map
-          setCurrentLocation({ x: 0.5, y: 0.5 });
-        }
-      );
+    if (useCurrentLocation) {
+      getCurrentLocation();
     }
   }, [useCurrentLocation]);
+
+  const getCurrentLocation = async () => {
+    setIsLocating(true);
+    try {
+      // Try hybrid positioning first (WiFi + GPS)
+      let position = await scanPosition();
+      
+      // If hybrid positioning fails, try GPS only
+      if (!position) {
+        position = await gpsPositioning.getCurrentPosition();
+      }
+      
+      // If GPS fails, try browser geolocation as fallback
+      if (!position && navigator.geolocation) {
+        try {
+          const geoPosition = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 30000
+            });
+          });
+          
+          position = {
+            coordinates: [geoPosition.coords.longitude, geoPosition.coords.latitude],
+            accuracy: Math.min(geoPosition.coords.accuracy || 100, 100) / 100,
+            method: 'gps'
+          };
+        } catch (error) {
+          console.warn('Browser geolocation failed:', error);
+        }
+      }
+      
+      if (position) {
+        // Convert GPS coordinates to map pixel coordinates
+        const mapCoords = convertGPSToMapCoordinates(position.coordinates);
+        setCurrentLocation(mapCoords);
+        
+        toast({
+          title: "Location found",
+          description: `Located using ${position.method} (accuracy: ${Math.round(position.accuracy * 100)}%)`,
+        });
+      } else {
+        // Fallback to manual selection
+        toast({
+          title: "Location not available",
+          description: "Please tap on the map to set your current location manually",
+          variant: "destructive"
+        });
+        setCurrentLocation(null);
+      }
+    } catch (error) {
+      console.error('Location error:', error);
+      toast({
+        title: "Location error",
+        description: "Could not determine your location. Please tap on the map to set it manually.",
+        variant: "destructive"
+      });
+      setCurrentLocation(null);
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  // Convert GPS coordinates to map pixel coordinates
+  const convertGPSToMapCoordinates = (coordinates: [number, number]): { x: number; y: number } => {
+    const [longitude, latitude] = coordinates;
+    
+    // Try to load saved calibration data
+    const savedBounds = localStorage.getItem('schoolGPSBounds');
+    let schoolBounds;
+    
+    if (savedBounds) {
+      schoolBounds = JSON.parse(savedBounds);
+    } else {
+      // Default bounds (approximate small building)
+      schoolBounds = {
+        north: 40.7831,
+        south: 40.7821,
+        east: -73.9712,
+        west: -73.9722
+      };
+      
+      // Notify user that calibration is needed
+      toast({
+        title: "GPS calibration needed",
+        description: "Please set up GPS calibration for accurate positioning.",
+        variant: "destructive"
+      });
+    }
+    
+    // Convert GPS to normalized coordinates (0-1)
+    const x = (longitude - schoolBounds.west) / (schoolBounds.east - schoolBounds.west);
+    const y = (latitude - schoolBounds.south) / (schoolBounds.north - schoolBounds.south);
+    
+    // Clamp to valid range and invert Y (image coordinates start from top)
+    return {
+      x: Math.max(0, Math.min(1, x)),
+      y: Math.max(0, Math.min(1, 1 - y)) // Invert Y axis
+    };
+  };
 
   const calculateRoute = () => {
     if ((!selectedStart && !useCurrentLocation) || !selectedEnd) return;
@@ -284,7 +378,7 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
           {/* Current location */}
           {currentLocation && (
             <div
-              className="absolute w-4 h-4 bg-purple-500 border-2 border-purple-700 rounded-full transform -translate-x-1/2 -translate-y-1/2"
+              className="absolute w-4 h-4 bg-purple-500 border-2 border-purple-700 rounded-full transform -translate-x-1/2 -translate-y-1/2 animate-pulse"
               style={{
                 left: `${currentLocation.x * 100}%`,
                 top: `${currentLocation.y * 100}%`,
@@ -293,6 +387,14 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
               <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 px-2 py-1 bg-black/80 text-white text-xs rounded whitespace-nowrap">
                 Current Location
               </div>
+            </div>
+          )}
+          
+          {/* Loading indicator for location */}
+          {isLocating && (
+            <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/80 text-white px-3 py-2 rounded-lg">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm">Finding your location...</span>
             </div>
           )}
 
@@ -318,8 +420,20 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
           )}
         </div>
 
-        {/* Zoom controls */}
+        {/* Controls */}
         <div className="absolute top-4 right-4 flex flex-col gap-2">
+          {useCurrentLocation && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={getCurrentLocation}
+              disabled={isLocating}
+              className="flex items-center gap-2"
+            >
+              <MapPin className="h-4 w-4" />
+              {isLocating ? 'Locating...' : 'Refresh Location'}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="secondary"

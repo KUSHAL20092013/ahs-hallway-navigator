@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import navigationData from '@/data/navigationData.json';
-import { MapPin, Navigation, RotateCcw, Search } from 'lucide-react';
+import { MapPin, Navigation, RotateCcw, Search, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 // Define Room interface based on navigationData.json structure
 interface Room {
@@ -19,6 +20,7 @@ interface SearchNavigationProps {
 }
 
 export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigationProps) {
+  const navigate = useNavigate();
   // Get rooms from navigationData.json
   const rooms = navigationData.rooms || [];
   const [startInput, setStartInput] = useState('');
@@ -92,6 +94,20 @@ export function SearchNavigation({ onRouteCalculate, onClear }: SearchNavigation
 
   return (
     <div className="bg-card border-b border-border/50 p-4 space-y-3">
+      {/* Header with title and setup button */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-semibold">AHS Navigator</h1>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => navigate('/setup')}
+          className="flex items-center gap-2"
+        >
+          <Settings className="h-4 w-4" />
+          Setup
+        </Button>
+      </div>
+      
       {/* Start Location */}
       <div className="relative">
         <div className="relative">

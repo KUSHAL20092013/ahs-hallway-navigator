@@ -112,12 +112,16 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
       if (position) {
         // Convert GPS coordinates to map pixel coordinates
         const mapCoords = convertGPSToMapCoordinates(position.coordinates);
-        setCurrentLocation(mapCoords);
-        
-        toast({
-          title: "Location found",
-          description: `Located using ${position.method} (accuracy: ${Math.round(position.accuracy * 100)}%)`,
-        });
+        if (mapCoords) {
+          setCurrentLocation(mapCoords);
+          
+          toast({
+            title: "Location found",
+            description: `Located using ${position.method} (accuracy: ${Math.round(position.accuracy * 100)}%)`,
+          });
+        } else {
+          setCurrentLocation(null);
+        }
       } else {
         // Fallback to manual selection
         toast({
@@ -140,41 +144,45 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
     }
   };
 
+  // Campus boundaries
+  const CAMPUS_BOUNDS = {
+    north: 37.566092,
+    south: 37.562864,
+    east: -122.013955,
+    west: -122.018535
+  };
+
+  // Check if coordinates are within campus bounds
+  const isWithinCampus = (coordinates: [number, number]): boolean => {
+    const [longitude, latitude] = coordinates;
+    return latitude >= CAMPUS_BOUNDS.south && 
+           latitude <= CAMPUS_BOUNDS.north && 
+           longitude >= CAMPUS_BOUNDS.west && 
+           longitude <= CAMPUS_BOUNDS.east;
+  };
+
   // Convert GPS coordinates to map pixel coordinates
-  const convertGPSToMapCoordinates = (coordinates: [number, number]): { x: number; y: number } => {
+  const convertGPSToMapCoordinates = (coordinates: [number, number]): { x: number; y: number } | null => {
     const [longitude, latitude] = coordinates;
     
-    // Try to load saved calibration data
-    const savedBounds = localStorage.getItem('schoolGPSBounds');
-    let schoolBounds;
-    
-    if (savedBounds) {
-      schoolBounds = JSON.parse(savedBounds);
-    } else {
-      // Default bounds (approximate small building)
-      schoolBounds = {
-        north: 40.7831,
-        south: 40.7821,
-        east: -73.9712,
-        west: -73.9722
-      };
-      
-      // Notify user that calibration is needed
+    // Check if within campus bounds first
+    if (!isWithinCampus(coordinates)) {
       toast({
-        title: "GPS calibration needed",
-        description: "Please set up GPS calibration for accurate positioning.",
+        title: "Location unavailable",
+        description: "This function only works on campus.",
         variant: "destructive"
       });
+      return null;
     }
     
-    // Convert GPS to normalized coordinates (0-1)
-    const x = (longitude - schoolBounds.west) / (schoolBounds.east - schoolBounds.west);
-    const y = (latitude - schoolBounds.south) / (schoolBounds.north - schoolBounds.south);
+    // Convert GPS to normalized coordinates (0-1) using campus bounds
+    const x = (longitude - CAMPUS_BOUNDS.west) / (CAMPUS_BOUNDS.east - CAMPUS_BOUNDS.west);
+    const y = (latitude - CAMPUS_BOUNDS.south) / (CAMPUS_BOUNDS.north - CAMPUS_BOUNDS.south);
     
-    // Clamp to valid range and invert Y (image coordinates start from top)
+    // Invert Y axis (image coordinates start from top)
     return {
       x: Math.max(0, Math.min(1, x)),
-      y: Math.max(0, Math.min(1, 1 - y)) // Invert Y axis
+      y: Math.max(0, Math.min(1, 1 - y))
     };
   };
 

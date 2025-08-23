@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { hybridPositioning, type PositioningConfig } from '@/services/hybridPositioning';
+import { hybridPositioning, PositioningConfig } from '@/services/hybridPositioning';
 import type { WiFiPositionResult } from '@/types/wifi';
 
 export const useHybridPositioning = () => {

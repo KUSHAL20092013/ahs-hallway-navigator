@@ -49,8 +49,10 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
   const [zoom, setZoom] = useState(1);
   const [currentLocation, setCurrentLocation] = useState<{ x: number; y: number } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [locationTracking, setLocationTracking] = useState<NodeJS.Timeout | null>(null);
+  const [lastRouteCheck, setLastRouteCheck] = useState<{ x: number; y: number } | null>(null);
   const { toast } = useToast();
-  const { scanPosition, currentPosition, config } = useHybridPositioning();
+  const { scanPosition, currentPosition, config, startContinuousScanning } = useHybridPositioning();
   const imageRef = useRef<HTMLImageElement>(null);
 
   // Load navigation data on mount
@@ -60,7 +62,7 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
     setPaths(navigationData.paths || []);
   }, []);
 
-  // Calculate route when start/end changes
+  // Calculate route when start/end changes or when current location moves significantly
   useEffect(() => {
     if ((selectedStart || useCurrentLocation) && selectedEnd) {
       calculateRoute();
@@ -70,11 +72,54 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
     }
   }, [selectedStart, selectedEnd, useCurrentLocation, waypoints, paths, currentLocation]);
 
-  // Get current location using hybrid positioning
+  // Check if user is off route and recalculate if needed
+  useEffect(() => {
+    if (useCurrentLocation && currentLocation && route.length > 0 && lastRouteCheck) {
+      const distanceMoved = Math.hypot(
+        currentLocation.x - lastRouteCheck.x,
+        currentLocation.y - lastRouteCheck.y
+      );
+      
+      // If user moved more than 5% of map width/height, check if they're off route
+      if (distanceMoved > 0.05) {
+        const isOffRoute = !isNearRoute(currentLocation, route, 0.03); // 3% tolerance
+        if (isOffRoute) {
+          toast({
+            title: "Route updated",
+            description: "You've moved off the planned route. Recalculating...",
+          });
+          calculateRoute();
+        }
+        setLastRouteCheck(currentLocation);
+      }
+    } else if (currentLocation && !lastRouteCheck) {
+      setLastRouteCheck(currentLocation);
+    }
+  }, [currentLocation, route, useCurrentLocation]);
+
+  // Start continuous location tracking when useCurrentLocation is enabled
   useEffect(() => {
     if (useCurrentLocation) {
       getCurrentLocation();
+      // Start continuous tracking every 3 seconds
+      const trackingInterval = setInterval(() => {
+        getCurrentLocation();
+      }, 3000);
+      setLocationTracking(trackingInterval);
+    } else {
+      // Stop tracking when disabled
+      if (locationTracking) {
+        clearInterval(locationTracking);
+        setLocationTracking(null);
+      }
     }
+
+    // Cleanup on unmount or when useCurrentLocation changes
+    return () => {
+      if (locationTracking) {
+        clearInterval(locationTracking);
+      }
+    };
   }, [useCurrentLocation]);
 
   const getCurrentLocation = async () => {
@@ -335,6 +380,51 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
     return directions;
   };
 
+  // Helper function to check if user is near the planned route
+  const isNearRoute = (position: { x: number; y: number }, route: Waypoint[], tolerance: number): boolean => {
+    if (route.length < 2) return true;
+    
+    for (let i = 0; i < route.length - 1; i++) {
+      const start = route[i];
+      const end = route[i + 1];
+      
+      // Calculate distance from point to line segment
+      const distanceToSegment = distancePointToLineSegment(position, start, end);
+      if (distanceToSegment <= tolerance) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Helper function to calculate distance from point to line segment
+  const distancePointToLineSegment = (
+    point: { x: number; y: number },
+    start: { x: number; y: number },
+    end: { x: number; y: number }
+  ): number => {
+    const A = point.x - start.x;
+    const B = point.y - start.y;
+    const C = end.x - start.x;
+    const D = end.y - start.y;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    
+    if (lenSq === 0) return Math.sqrt(A * A + B * B);
+    
+    let param = dot / lenSq;
+    if (param < 0) param = 0;
+    if (param > 1) param = 1;
+
+    const xx = start.x + param * C;
+    const yy = start.y + param * D;
+
+    const dx = point.x - xx;
+    const dy = point.y - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
     if (!imageRef.current) return;
     
@@ -344,6 +434,7 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
     
     if (useCurrentLocation) {
       setCurrentLocation({ x, y });
+      setLastRouteCheck({ x, y });
     }
   };
 
@@ -383,17 +474,20 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
             </div>
           ))}
 
-          {/* Current location */}
+          {/* Current location - Always visible when tracking */}
           {currentLocation && (
             <div
-              className="absolute w-4 h-4 bg-purple-500 border-2 border-purple-700 rounded-full transform -translate-x-1/2 -translate-y-1/2 animate-pulse"
+              className="absolute w-4 h-4 bg-purple-500 border-2 border-purple-700 rounded-full transform -translate-x-1/2 -translate-y-1/2 z-10"
               style={{
                 left: `${currentLocation.x * 100}%`,
                 top: `${currentLocation.y * 100}%`,
+                boxShadow: '0 0 10px rgba(147, 51, 234, 0.6)'
               }}
             >
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 px-2 py-1 bg-black/80 text-white text-xs rounded whitespace-nowrap">
-                Current Location
+              {/* Pulse animation ring */}
+              <div className="absolute inset-0 rounded-full border-2 border-purple-400 animate-ping"></div>
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 px-2 py-1 bg-purple-900/90 text-white text-xs rounded whitespace-nowrap">
+                You are here
               </div>
             </div>
           )}

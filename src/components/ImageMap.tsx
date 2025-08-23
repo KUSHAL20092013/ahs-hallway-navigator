@@ -347,38 +347,104 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
     return [];
   };
 
-  //function to calculate directions, including finding the distance from one place to another. 
+  //function to calculate directions using natural language
   const calculateDirections = (route: Waypoint[]): string[] => {
     const directions = [];
     
-    for (let i = 0; i < route.length - 1; i++) {
+    if (route.length === 0) return directions;
+    
+    // Start instruction
+    directions.push(`Start here and head toward ${route.length > 1 ? getDestinationName(route[route.length - 1]) : 'your destination'}`);
+    
+    for (let i = 1; i < route.length - 1; i++) {
+      const prev = route[i - 1];
       const current = route[i];
       const next = route[i + 1];
       
-      if (i === 0) {
-        directions.push(`Start at ${current.name}`);
-      }
+      const turnDirection = getTurnDirection(prev, current, next);
+      const distance = Math.sqrt(Math.pow((current.x - prev.x) * 100, 2) + Math.pow((current.y - prev.y) * 100, 2));
       
-      const dx = next.x - current.x;
-      const dy = next.y - current.y;
-      const distance = Math.sqrt(dx * dx + dy * dy) * 100; // Approximate distance
-      // defining what exactly the cardinal directions are
-      let direction = '';
-      if (Math.abs(dx) > Math.abs(dy)) {
-        direction = dx > 0 ? 'east' : 'west';
+      if (turnDirection !== 'straight') {
+        directions.push(`In ${Math.round(distance)}m, ${turnDirection}`);
       } else {
-        direction = dy > 0 ? 'south' : 'north';
+        directions.push(`Continue straight for ${Math.round(distance)}m`);
       }
-      //directions outline / template
-      directions.push(`Go ${direction} to ${next.name} (${Math.round(distance)}m)`);
     }
     
-    if (route.length > 0) {
-      directions.push(`Arrive at ${route[route.length - 1].name}`);
+    if (route.length > 1) {
+      const secondToLast = route[route.length - 2];
+      const destination = route[route.length - 1];
+      const finalDistance = Math.sqrt(Math.pow((destination.x - secondToLast.x) * 100, 2) + Math.pow((destination.y - secondToLast.y) * 100, 2));
+      directions.push(`Continue ${Math.round(finalDistance)}m to arrive at ${getDestinationName(destination)}`);
     }
     
     return directions;
   };
+
+  // Helper function to get natural destination name
+  const getDestinationName = (waypoint: Waypoint): string => {
+    if (waypoint.name.toLowerCase().includes('room')) return waypoint.name;
+    if (waypoint.name.toLowerCase().includes('entrance')) return 'the entrance';
+    if (waypoint.name.toLowerCase().includes('hallway')) return 'the hallway';
+    return waypoint.name;
+  };
+
+  // Helper function to determine turn direction using angle calculation
+  const getTurnDirection = (prev: Waypoint, current: Waypoint, next: Waypoint): string => {
+    // Calculate angle between the three points
+    const angle1 = Math.atan2(current.y - prev.y, current.x - prev.x);
+    const angle2 = Math.atan2(next.y - current.y, next.x - current.x);
+    
+    let angleDiff = angle2 - angle1;
+    
+    // Normalize angle to [-π, π]
+    if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+    
+    const degrees = (angleDiff * 180) / Math.PI;
+    
+    if (Math.abs(degrees) < 15) return 'straight';
+    if (degrees > 15 && degrees < 45) return 'take a slight right';
+    if (degrees >= 45 && degrees < 135) return 'turn right';
+    if (degrees >= 135) return 'turn sharply right';
+    if (degrees < -15 && degrees > -45) return 'take a slight left';
+    if (degrees <= -45 && degrees > -135) return 'turn left';
+    if (degrees <= -135) return 'turn sharply left';
+    
+    return 'continue';
+  };
+
+  // Check if user is near a turn waypoint and show real-time directions
+  useEffect(() => {
+    if (!currentLocation || !useCurrentLocation || route.length < 3) return;
+
+    const proximityThreshold = 0.04; // 4% of map size
+    
+    // Check if near any waypoint that requires a turn
+    for (let i = 1; i < route.length - 1; i++) {
+      const prev = route[i - 1];
+      const current = route[i];
+      const next = route[i + 1];
+      
+      const distance = Math.hypot(
+        currentLocation.x - current.x,
+        currentLocation.y - current.y
+      );
+      
+      if (distance < proximityThreshold) {
+        const turnDirection = getTurnDirection(prev, current, next);
+        
+        if (turnDirection !== 'straight' && turnDirection !== 'continue') {
+          toast({
+            title: "Navigation",
+            description: `${turnDirection.charAt(0).toUpperCase() + turnDirection.slice(1)} now`,
+            duration: 3000,
+          });
+        }
+        break; // Only show one turn instruction at a time
+      }
+    }
+  }, [currentLocation, route, useCurrentLocation]);
 
   // Helper function to check if user is near the planned route
   const isNearRoute = (position: { x: number; y: number }, route: Waypoint[], tolerance: number): boolean => {

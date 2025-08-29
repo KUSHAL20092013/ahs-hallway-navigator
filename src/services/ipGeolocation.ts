@@ -6,8 +6,7 @@ export interface IPLocationResult {
   city: string;
   country: string;
   region: string;
-  accuracy: string;
-  status: string;
+  success: boolean;
 }
 
 export class IPGeolocationService {
@@ -17,20 +16,41 @@ export class IPGeolocationService {
     try {
       console.log('Getting location via IP geolocation...');
       
-      // Using ip-api.com free service (no API key required)
-      const response = await fetch('http://ip-api.com/json/?fields=status,message,country,region,city,lat,lon,accuracy');
-      
+      // Try ipapi.co first (HTTPS)
+      try {
+        const response = await fetch('https://ipapi.co/json/');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('IP geolocation result (ipapi.co):', data);
+          
+          if (data.latitude && data.longitude) {
+            const result: WiFiPositionResult = {
+              coordinates: [data.longitude, data.latitude],
+              accuracy: 0.05, // ~20km accuracy for IP geolocation
+              method: 'ip-geolocation'
+            };
+            
+            this.lastKnownPosition = result;
+            return result;
+          }
+        }
+      } catch (apiError) {
+        console.log('ipapi.co failed, trying backup...');
+      }
+
+      // Fallback to ipwho.is (HTTPS)
+      const response = await fetch('https://ipwho.is/');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data: IPLocationResult = await response.json();
-      console.log('IP geolocation result:', data);
+      const data = await response.json();
+      console.log('IP geolocation result (ipwho.is):', data);
       
-      if (data.status === 'success') {
+      if (data.success && data.latitude && data.longitude) {
         const result: WiFiPositionResult = {
-          coordinates: [data.lon, data.lat],
-          accuracy: 0.3, // IP geolocation is generally less accurate
+          coordinates: [data.longitude, data.latitude],
+          accuracy: 0.05, // ~20km accuracy for IP geolocation
           method: 'ip-geolocation'
         };
         
@@ -38,7 +58,7 @@ export class IPGeolocationService {
         return result;
       } else {
         console.error('IP geolocation failed:', data);
-        return null;
+        return this.lastKnownPosition;
       }
     } catch (error) {
       console.error('IP geolocation service error:', error);

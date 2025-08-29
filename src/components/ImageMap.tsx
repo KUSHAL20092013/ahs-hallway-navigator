@@ -214,7 +214,7 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
     if (!isWithinCampus(coordinates)) {
       toast({
         title: "Location unavailable",
-        description: "This function only works on campus.",
+        description: `This function only works on campus. Current coordinates: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
         variant: "destructive"
       });
       return null;

@@ -1,4 +1,4 @@
-# Welcome to The AHS Hallway Navigator
+# Welcome to The AHS Navigator
 ## Project info
 
 **URL**: 

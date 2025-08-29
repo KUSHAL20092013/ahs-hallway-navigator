@@ -124,39 +124,79 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
 
   const getCurrentLocation = async () => {
     setIsLocating(true);
+    console.log('Getting current location...');
+    
     try {
-      // Try hybrid positioning first (WiFi + GPS)
-      let position = await scanPosition();
-      
-      // If hybrid positioning fails, try GPS only
-      if (!position) {
-        position = await gpsPositioning.getCurrentPosition();
+      // First, explicitly request permissions
+      if ('geolocation' in navigator) {
+        // Check if we have permission
+        const permissionStatus = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
+        console.log('Geolocation permission status:', permissionStatus?.state);
+        
+        // If denied, show helpful message
+        if (permissionStatus?.state === 'denied') {
+          toast({
+            title: "Location permission denied",
+            description: "Please enable location access in your browser settings and refresh the page.",
+            variant: "destructive"
+          });
+          setCurrentLocation(null);
+          setIsLocating(false);
+          return;
+        }
       }
       
-      // If GPS fails, try browser geolocation as fallback
+      // Try hybrid positioning first (WiFi + GPS)
+      console.log('Trying hybrid positioning...');
+      let position = await scanPosition();
+      console.log('Hybrid positioning result:', position);
+      
+      // If hybrid positioning fails, try Capacitor GPS 
+      if (!position) {
+        console.log('Trying Capacitor GPS...');
+        position = await gpsPositioning.getCurrentPosition();
+        console.log('Capacitor GPS result:', position);
+      }
+      
+      // If Capacitor fails, try browser geolocation as fallback
       if (!position && navigator.geolocation) {
+        console.log('Trying browser geolocation...');
         try {
           const geoPosition = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 30000
-            });
+            navigator.geolocation.getCurrentPosition(
+              resolve, 
+              (error) => {
+                console.error('Browser geolocation error:', error);
+                reject(error);
+              }, 
+              {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 60000
+              }
+            );
           });
+          
+          console.log('Browser geolocation result:', geoPosition.coords);
           
           position = {
             coordinates: [geoPosition.coords.longitude, geoPosition.coords.latitude],
             accuracy: Math.min(geoPosition.coords.accuracy || 100, 100) / 100,
-            method: 'gps'
+            method: 'browser'
           };
         } catch (error) {
-          console.warn('Browser geolocation failed:', error);
+          console.error('Browser geolocation failed:', error);
         }
       }
       
+      console.log('Final position result:', position);
+      
       if (position) {
+        console.log('Converting GPS coordinates to map coordinates...');
         // Convert GPS coordinates to map pixel coordinates
         const mapCoords = convertGPSToMapCoordinates(position.coordinates);
+        console.log('Map coordinates:', mapCoords);
+        
         if (mapCoords) {
           setCurrentLocation(mapCoords);
           
@@ -168,10 +208,11 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
           setCurrentLocation(null);
         }
       } else {
+        console.log('No position available, requesting manual selection');
         // Fallback to manual selection
         toast({
-          title: "Location not available",
-          description: "Please tap on the map to set your current location manually",
+          title: "Location not available", 
+          description: "Please tap on the map to set your current location manually. Make sure location permissions are enabled.",
           variant: "destructive"
         });
         setCurrentLocation(null);
@@ -180,7 +221,7 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
       console.error('Location error:', error);
       toast({
         title: "Location error",
-        description: "Could not determine your location. Please tap on the map to set it manually.",
+        description: `Could not determine your location: ${error.message || error}. Please tap on the map to set it manually.`,
         variant: "destructive"
       });
       setCurrentLocation(null);

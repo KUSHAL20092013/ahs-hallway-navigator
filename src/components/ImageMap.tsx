@@ -8,8 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Navigation, ZoomIn, ZoomOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useHybridPositioning } from '@/hooks/useHybridPositioning';
-import { gpsPositioning } from '@/services/gpsPositioning';
 import { ipGeolocation } from '@/services/ipGeolocation';
 import navigationData from '@/data/navigationData.json';
 
@@ -53,7 +51,6 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
   const [locationTracking, setLocationTracking] = useState<NodeJS.Timeout | null>(null);
   const [lastRouteCheck, setLastRouteCheck] = useState<{ x: number; y: number } | null>(null);
   const { toast } = useToast();
-  const { scanPosition, currentPosition, config, startContinuousScanning } = useHybridPositioning();
   const imageRef = useRef<HTMLImageElement>(null);
 
   // Load navigation data on mount
@@ -125,82 +122,16 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
 
   const getCurrentLocation = async () => {
     setIsLocating(true);
-    console.log('Getting current location...');
+    console.log('Getting current location via IP geolocation...');
     
     try {
-      // First, explicitly request permissions
-      if ('geolocation' in navigator) {
-        // Check if we have permission
-        const permissionStatus = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
-        console.log('Geolocation permission status:', permissionStatus?.state);
-        
-        // If denied, show helpful message
-        if (permissionStatus?.state === 'denied') {
-          toast({
-            title: "Location permission denied",
-            description: "Please enable location access in your browser settings and refresh the page.",
-            variant: "destructive"
-          });
-          setCurrentLocation(null);
-          setIsLocating(false);
-          return;
-        }
-      }
-      
-      // Try hybrid positioning first (WiFi + GPS)
-      console.log('Trying hybrid positioning...');
-      let position = await scanPosition();
-      console.log('Hybrid positioning result:', position);
-      
-      // If hybrid positioning fails, try Capacitor GPS 
-      if (!position) {
-        console.log('Trying Capacitor GPS...');
-        position = await gpsPositioning.getCurrentPosition();
-        console.log('Capacitor GPS result:', position);
-      }
-      
-      // If Capacitor fails, try IP geolocation
-      if (!position) {
-        console.log('Trying IP geolocation...');
-        position = await ipGeolocation.getCurrentPosition();
-        console.log('IP geolocation result:', position);
-      }
-      
-      // If IP geolocation fails, try browser geolocation as final fallback
-      if (!position && navigator.geolocation) {
-        console.log('Trying browser geolocation...');
-        try {
-          const geoPosition = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(
-              resolve, 
-              (error) => {
-                console.error('Browser geolocation error:', error);
-                reject(error);
-              }, 
-              {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 60000
-              }
-            );
-          });
-          
-          console.log('Browser geolocation result:', geoPosition.coords);
-          
-          position = {
-            coordinates: [geoPosition.coords.longitude, geoPosition.coords.latitude],
-            accuracy: Math.min(geoPosition.coords.accuracy || 100, 100) / 100,
-            method: 'browser'
-          };
-        } catch (error) {
-          console.error('Browser geolocation failed:', error);
-        }
-      }
-      
-      console.log('Final position result:', position);
+      // Use only IP geolocation
+      console.log('Using IP geolocation service...');
+      const position = await ipGeolocation.getCurrentPosition();
+      console.log('IP geolocation result:', position);
       
       if (position) {
-        console.log('Converting GPS coordinates to map coordinates...');
+        console.log('Converting IP coordinates to map coordinates...');
         // Convert GPS coordinates to map pixel coordinates
         const mapCoords = convertGPSToMapCoordinates(position.coordinates);
         console.log('Map coordinates:', mapCoords);
@@ -210,17 +141,16 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
           
           toast({
             title: "Location found",
-            description: `Located using ${position.method} (accuracy: ${Math.round(position.accuracy * 100)}%)`,
+            description: `Located using ${position.method} (estimated accuracy: ${Math.round(position.accuracy * 100)}%)`,
           });
         } else {
           setCurrentLocation(null);
         }
       } else {
-        console.log('No position available, requesting manual selection');
-        // Fallback to manual selection
+        console.log('IP geolocation failed, requesting manual selection');
         toast({
           title: "Location not available", 
-          description: "Please tap on the map to set your current location manually. Make sure location permissions are enabled.",
+          description: "IP geolocation failed. Please tap on the map to set your current location manually.",
           variant: "destructive"
         });
         setCurrentLocation(null);

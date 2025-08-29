@@ -10,6 +10,7 @@ import { MapPin, Navigation, ZoomIn, ZoomOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useHybridPositioning } from '@/hooks/useHybridPositioning';
 import { gpsPositioning } from '@/services/gpsPositioning';
+import { ipGeolocation } from '@/services/ipGeolocation';
 import navigationData from '@/data/navigationData.json';
 
 interface Waypoint {
@@ -158,7 +159,14 @@ export const ImageMap = ({ selectedStart, selectedEnd, useCurrentLocation = fals
         console.log('Capacitor GPS result:', position);
       }
       
-      // If Capacitor fails, try browser geolocation as fallback
+      // If Capacitor fails, try IP geolocation
+      if (!position) {
+        console.log('Trying IP geolocation...');
+        position = await ipGeolocation.getCurrentPosition();
+        console.log('IP geolocation result:', position);
+      }
+      
+      // If IP geolocation fails, try browser geolocation as final fallback
       if (!position && navigator.geolocation) {
         console.log('Trying browser geolocation...');
         try {

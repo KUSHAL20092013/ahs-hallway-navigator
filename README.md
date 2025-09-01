@@ -56,3 +56,9 @@ This project is built with:
 1. ImageMap.tsx - This is where yhr majority of the logic happens. We initialize everything on the map such as the waypoints, rooms, paths, and the image itself. This includes adding the x and y coordinates to the json file called navigationData.json. Constructing the path also happens here. Current location code is here too so it asks user for permission, then maps the geolocation coordinates to the image pixel coordinates to create a box area of coordinates. by comparing the scale value of the image coordinates and the geopositioning coordinates, the function estimates how far the user has to walk.
    
 2. SearchNavigation.tsx - This is the class which filters rooms based on what the user first types. It also includes the initial current location option which users see when they first load the app.
+
+## How to Build a similar app for your own institution
+# Step 1: create a similar UI with a taskbar on the side with a mode to put dots where you touch with the name of rooms and another mode to put dots where you touch called waypoints. Make sure you export these coordinates into a JSON file which you will import later. 
+# Step 2: Make the points in stratigic locations, minimizing the amount of waypoints so that the algorithm will work efficiently. 
+# Step 3: Import the rooms and waypoints json file but remember to hide the waypoints so that your map will not feel messy. 
+# Step 4: Create a Path mode to connect all waypoints without going through walls. You usually do this by tapping on the two waypoints you want to connect and there will be a straight line formed between them. 
